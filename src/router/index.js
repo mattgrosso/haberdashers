@@ -1,11 +1,31 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
+import AwardsConfig from "@/views/AwardsConfig.vue";
 import Login from "../views/Login.vue";
 import { auth } from "../firebase";
 
 const routes = [
-  { path: "/", component: Home, meta: { requiresAuth: true } },
-  { path: "/login", component: Login },
+  {
+    path: "/",
+    component: Home,
+    meta: {
+      requiresAuth: true 
+    }
+  },
+  { 
+    path: "/login", 
+    component: Login,
+    meta: {
+      requiresAuth: false 
+    }
+  },
+  {
+    path: "/admin",
+    component: AwardsConfig,
+    meta: {
+      requiresAuth: true 
+    }
+  },
 ];
 
 const router = createRouter({

@@ -1,8 +1,10 @@
 <template>
-  <div>
-    <p>Home!</p>
-    <p v-if="userName">Welcome, {{ userName }}!</p>
-    <button @click="logout">Log out</button>
+  <div class="container mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-6 text-center">
+        <p v-if="userName">Welcome, {{ userName }}!</p>
+      </div>
+    </div>
   </div>
 </template>
 

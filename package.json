@@ -8,6 +8,9 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
     "core-js": "^3.8.3",
     "firebase": "^11.2.0",
     "vue": "^3.2.13",
@@ -73,7 +76,9 @@
       "space-infix-ops": "warn",
       "space-before-blocks": "warn",
       "no-unreachable": "warn",
-      "no-constant-condition": "warn"
+      "no-constant-condition": "warn",
+      "operator-linebreak": "off",
+      "multiline-ternary": "off"
     }
   },
   "browserslist": [
