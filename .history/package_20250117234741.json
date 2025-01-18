@@ -29,50 +29,16 @@
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true,
-      "browser": true,
-      "es2021": true
+      "node": true
     },
     "extends": [
       "plugin:vue/vue3-essential",
-      "eslint:recommended",
-      "plugin:promise/recommended",
       "@vue/standard"
     ],
     "parserOptions": {
-      "ecmaVersion": 12,
-      "sourceType": "module",
       "parser": "@babel/eslint-parser"
     },
-    "rules": {
-      "vue/no-unused-components": "off",
-      "vue/multi-word-component-names": "off",
-      "no-trailing-spaces": "warn",
-      "eol-last": "off",
-      "quotes": [
-        "off",
-        "double"
-      ],
-      "semi": "off",
-      "comma-dangle": "off",
-      "space-before-function-paren": "warn",
-      "indent": "warn",
-      "no-undef": "warn",
-      "padded-blocks": "warn",
-      "object-curly-spacing": "warn",
-      "array-bracket-spacing": "warn",
-      "no-unused-vars": "warn",
-      "no-empty": "warn",
-      "prefer-const": "warn",
-      "no-multiple-empty-lines": "warn",
-      "no-useless-return": "off",
-      "no-debugger": "warn",
-      "vue/no-deprecated-slot-scope-attribute": "warn",
-      "space-infix-ops": "warn",
-      "space-before-blocks": "warn",
-      "no-unreachable": "warn",
-      "no-constant-condition": "warn"
-    }
+    "rules": {}
   },
   "browserslist": [
     "> 1%",
