@@ -1,13 +1,28 @@
 <template>
   <div class="awards-config p-3 mb-5">
     <div class="card">
-      <div class="card-header">
+      <div class="card-header bg-primary text-white">
         <h2 class="card-title text-center">Award Categories</h2>
       </div>
       <ul class="list-group list-group-flush">
         <li class="list-group-item" v-for="award in awards" :key="award.key">
-          <h3>{{ award.name }}</h3>
-          <p>{{ award.description }}</p>
+          <div class="d-flex flex-wrap">
+            <div class="name-and-description col-8">
+              <h3>{{ award.name }}</h3>
+              <p class="m-0">{{ award.description }}</p>
+            </div>
+            <div class="add-year-button col-4">
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-link btn-sm" @click="toggleYearInput(award)">
+                  <i class="bi bi-plus"></i>
+                </button>
+              </div>
+            </div>
+            <div v-if="award.showYearInput" class="input-group my-3 col-12">
+              <input :ref="`${award.name}-newYearInput`" type="text" class="form-control form-control-sm" placeholder="Add Year">
+              <button class="btn btn-secondary btn-sm" @click="addYearTo(award)">Add Year</button>
+            </div>
+          </div>
           <ul class="list-group list-group-flush">
             <li class="list-group-item" v-for="(year, index) in sortYears(award.years)" :key="index">
               <div @click="toggleYearCollapse(year)" role="button" class="d-flex justify-content-between align-items-center">
@@ -20,9 +35,9 @@
                     {{nominee.name}}
                   </li>
                 </ol>
-                <div class="d-flex justify-content-end">
-                  <button class="btn btn-success btn-sm" @click="toggleNomineeInput(award, year)">
-                    <span>Add Nominee for {{ year.year }}</span>
+                <div class="d-flex justify-content-end mt-2 my-4">
+                  <button class="btn btn-outline-success btn-sm" @click="toggleNomineeInput(award, year)">
+                    <span>add nominee</span>
                   </button>
                 </div>
                 <div v-if="year.showNomineeInput" class="input-group my-3 d-flex justify-content-end">
@@ -32,20 +47,26 @@
               </div>
             </li>
           </ul>
-          <div class="d-flex justify-content-end">
-            <button class="btn btn-success btn-sm" @click="toggleYearInput(award)">
-              <span>Add Year for {{ award.name }}</span>
-            </button>
-          </div>
-          <div v-if="award.showYearInput" class="input-group my-3">
-            <input :ref="`${award.name}-newYearInput`" type="text" class="form-control form-control-sm" placeholder="Add Year">
-            <button class="btn btn-secondary btn-sm" @click="addYearTo(award)">Add Year</button>
-          </div>
         </li>
       </ul>
     </div>
+    <div class="card my-4">
+      <div class="card-header bg-primary text-white">
+        <h2 class="card-title text-center">Category Order on Ballot</h2>
+      </div>
+      <div class="card-body">
+        <draggable v-model="awards" @end="updateCategoryOrder" class="list-group">
+          <template #item="{ element }">
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <span>{{ element.name }}</span>
+              <i class="bi bi-grip-vertical"></i>
+            </div>
+          </template>
+        </draggable>
+      </div>
+    </div>
     <div class="d-flex justify-content-start mt-3">
-      <button class="btn btn-primary" @click="toggleCategoryForm">
+      <button class="btn" :class="{'btn-primary': !showCategoryForm, 'btn-warning': showCategoryForm}" @click="toggleCategoryForm">
         <span v-if="showCategoryForm">Hide Form</span>
         <span v-else>Add Category</span>
       </button>
@@ -70,12 +91,16 @@
 </template>
 
 <script>
-import { getDatabase, ref, get, set, onValue } from "firebase/database";
+import draggable from "vuedraggable";
+import { getDatabase, ref, get, set, update, onValue } from "firebase/database";
 
 const db = getDatabase();
 
 export default {
   name: "AwardsConfig",
+  components: {
+    draggable,
+  },
   data() {
     return {
       newAwardName: "",
@@ -97,10 +122,12 @@ export default {
           await set(awardRef, {
             name: this.newAwardName,
             description: this.newAwardDescription,
+            rank: this.awards.length // Set the rank to the end of the list
           });
           this.newAwardName = "";
           this.newAwardDescription = "";
           this.showCategoryForm = false;
+          this.fetchAwards();
         }
       } catch (error) {
         console.error("Error creating award:", error);
@@ -123,7 +150,7 @@ export default {
             showNomineeInput: false,
             isOpen: parseInt(year) === parseInt(previousYear) && parseInt(currentMonth) < 4
           })) : []
-        })) : [];
+        })).sort((a, b) => a.rank - b.rank) : [];
       });
     },
     toggleYearInput(award) {
@@ -181,6 +208,17 @@ export default {
     },
     toggleYearCollapse(year) {
       year.isOpen = !year.isOpen;
+    },
+    async updateCategoryOrder() {
+      const updates = {};
+      this.awards.forEach((award, index) => {
+        updates[`/awards/${award.key}/rank`] = index;
+      });
+      try {
+        await update(ref(db), updates);
+      } catch (error) {
+        console.error("Error updating category order:", error);
+      }
     }
   },
   created() {
@@ -190,5 +228,35 @@ export default {
 </script>
 
 <style lang="scss">
+@import "@/assets/custom-bootstrap.scss";
 
+.awards-config {
+  max-width: 800px;
+  margin: 0 auto;
+
+  .card-header {
+    background-color: $primary;
+    color: white;
+  }
+
+  .btn-primary {
+    background-color: $primary;
+    border-color: $primary;
+
+    &:hover {
+      background-color: darken($primary, 10%);
+      border-color: darken($primary, 10%);
+    }
+  }
+
+  .btn-warning {
+    background-color: $warning;
+    border-color: $warning;
+
+    &:hover {
+      background-color: darken($warning, 10%);
+      border-color: darken($warning, 10%);
+    }
+  }
+}
 </style>

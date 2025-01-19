@@ -1,8 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
-import AwardsConfig from "@/views/AwardsConfig.vue";
+import AwardsConfig from "../views/AwardsConfig.vue";
 import Login from "../views/Login.vue";
 import { auth } from "../firebase";
+import { getDatabase, ref, get } from "firebase/database";
+
+const db = getDatabase();
 
 const routes = [
   {
@@ -23,7 +26,8 @@ const routes = [
     path: "/admin",
     component: AwardsConfig,
     meta: {
-      requiresAuth: true 
+      requiresAuth: true,
+      requiresAdmin: true
     }
   },
 ];
@@ -33,12 +37,28 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
+  const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin);
   const isAuthenticated = auth.currentUser;
 
   if (requiresAuth && !isAuthenticated) {
     next("/login");
+  } else if (requiresAdmin) {
+    if (isAuthenticated) {
+      const adminRef = ref(db, "admins");
+      const snapshot = await get(adminRef);
+      const adminUsers = snapshot.exists() ? snapshot.val() : [];
+      const userIsAdmin = adminUsers.includes(auth.currentUser.uid);
+
+      if (userIsAdmin) {
+        next();
+      } else {
+        next("/");
+      }
+    } else {
+      next("/login");
+    }
   } else {
     next();
   }

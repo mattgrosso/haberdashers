@@ -1,18 +1,25 @@
 <template>
-  <div class="container mt-5">
-    <div class="row justify-content-center">
-      <div class="col-md-6 text-center">
-        <p v-if="userName">Welcome, {{ userName }}!</p>
-      </div>
+  <div class="home">
+    <div class="px-3">
+      <h2 v-if="userName" class="text-center my-3">Welcome, {{ userName }}!</h2>
+      <p>Here is your 2024 ballot.</p>
+      <p>Please rank the nominees in each category from your favorite at the top to your least favorite at the bottom.</p>
+      <p>When you are finished, save your ballot.</p>
+      <p>You'll be able to make changes to your ballot up until the deadline at which time the ballots will be locked and the results tabulated.</p>
     </div>
+    <Ballot />
   </div>
 </template>
 
 <script>
 import { auth } from "../firebase";
+import Ballot from "../components/Ballot.vue";
 
 export default {
   name: "Home",
+  components: {
+    Ballot,
+  },
   computed: {
     userName() {
       return auth.currentUser ? auth.currentUser.displayName : null;
@@ -30,3 +37,11 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+.home {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+</style>

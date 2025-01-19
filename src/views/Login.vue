@@ -49,3 +49,23 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+@import "@/assets/custom-bootstrap.scss";
+
+.container {
+  .card {
+    border-color: $primary;
+  }
+
+  .btn-primary {
+    background-color: $primary;
+    border-color: $primary;
+
+    &:hover {
+      background-color: darken($primary, 10%);
+      border-color: darken($primary, 10%);
+    }
+  }
+}
+</style>
