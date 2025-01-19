@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC2JMoMSBdJ1H7tABdKb884iSQ2f2iGvqE",
+  apiKey: process.env.VUE_APP_GOOGLE_API_KEY,
   authDomain: "haberdasher-eb1f0.firebaseapp.com",
   projectId: "haberdasher-eb1f0",
   storageBucket: "haberdasher-eb1f0.firebasestorage.app",

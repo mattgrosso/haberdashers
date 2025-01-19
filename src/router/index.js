@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
 import AwardsConfig from "../views/AwardsConfig.vue";
 import Login from "../views/Login.vue";
-import { auth } from "../firebase";
+import { auth } from "../assets/javascript/firebase";
 import { getDatabase, ref, get } from "firebase/database";
 
 const db = getDatabase();

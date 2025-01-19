@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import { auth, googleProvider } from "../firebase";
+import { auth, googleProvider } from "../assets/javascript/firebase.js";
 import { signInWithPopup } from "firebase/auth";
 import { getDatabase, ref, get, set } from "firebase/database";
 

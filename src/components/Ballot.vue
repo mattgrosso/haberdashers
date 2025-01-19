@@ -43,7 +43,7 @@
 <script>
 import draggable from "vuedraggable";
 import { getDatabase, ref, get, set } from "firebase/database";
-import { auth } from "../firebase";
+import { auth } from "../assets/javascript/firebase.js";
 
 const db = getDatabase();
 

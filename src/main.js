@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
-import { auth } from "./firebase";
+import { auth } from "./assets/javascript/firebase";
 import "./assets/custom-bootstrap.scss"; // Import custom Bootstrap styles
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "@popperjs/core";

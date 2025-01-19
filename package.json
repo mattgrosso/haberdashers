@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "update-version": "node src/assets/javascript/version.js",
+    "serve": "nodemon --watch .env --exec \"vue-cli-service serve\"",
+    "build": "yarn update-version && vue-cli-service build",
+    "lint": "vue-cli-service lint",
+    "deploy": "yarn build && aws s3 sync dist/ s3://haberdashers --profile home && aws cloudfront create-invalidation --distribution-id E10LZ1505D1O9G --paths '/*' --profile home > invalidation_output.txt"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
@@ -13,6 +15,7 @@
     "bootstrap-icons": "^1.11.3",
     "core-js": "^3.8.3",
     "firebase": "^11.2.0",
+    "nodemon": "^3.1.9",
     "vue": "^3.2.13",
     "vue-router": "^4.5.0",
     "vuedraggable": "^4.1.0",

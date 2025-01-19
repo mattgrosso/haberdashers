@@ -12,7 +12,7 @@
 </template>
 
 <script>
-import { auth } from "../firebase";
+import { auth } from "../assets/javascript/firebase.js";
 import Ballot from "../components/Ballot.vue";
 
 export default {

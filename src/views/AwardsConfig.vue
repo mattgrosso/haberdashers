@@ -31,8 +31,11 @@
               </div>
               <div v-if="year.isOpen">
                 <ol class="list-group list-group-numbered my-2">
-                  <li class="list-group-item" v-for="(nominee, index) in alphabetizedNominees(year.nominees)" :key="index">
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(nominee, index) in alphabetizedNominees(year.nominees)" :key="index">
                     {{nominee.name}}
+                    <button class="btn btn-link btn-sm text-danger" @click="removeNominee(award, year.year, nominee.name)">
+                      <i class="bi bi-trash"></i>
+                    </button>
                   </li>
                 </ol>
                 <div class="d-flex justify-content-end mt-2 my-4">
@@ -92,7 +95,7 @@
 
 <script>
 import draggable from "vuedraggable";
-import { getDatabase, ref, get, set, update, onValue } from "firebase/database";
+import { getDatabase, ref, get, set, update, onValue, remove } from "firebase/database";
 
 const db = getDatabase();
 
@@ -180,6 +183,15 @@ export default {
         this.fetchAwards();
       }
       nomineeInput.value = "";
+    },
+    async removeNominee(award, year, nominee) {
+      try {
+        const nomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${nominee}`);
+        await remove(nomineeRef);
+        this.fetchAwards();
+      } catch (error) {
+        console.error("Error removing nominee:", error);
+      }
     },
     sortYears (years) {
       return years.sort((a, b) => {

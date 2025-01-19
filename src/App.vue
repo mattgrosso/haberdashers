@@ -34,7 +34,7 @@
 
 <script>
 import { Collapse } from "bootstrap";
-import { auth } from "./firebase";
+import { auth } from "./assets/javascript/firebase.js";
 import { getDatabase, ref, get } from "firebase/database";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
@@ -214,7 +214,7 @@ body, html {
   .navbar-nav {
     .nav-item {
       border-top: 1px solid white;
-      margin-bottom: 1rem;
+      width: 100%;
 
       &:last-of-type {
         border-bottom: 1px solid white;
