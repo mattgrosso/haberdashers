@@ -3,23 +3,10 @@
     <div v-for="award in sortedAwards" :key="award.key" class="card mb-3">
       <div class="card-header bg-primary text-white">
         <h3 class="card-title">{{ award.name }} of {{ yearToUse }}</h3>
+        <p class="card-text">{{ award.description }}</p>
       </div>
       <div class="card-body">
-        <draggable v-model="award.nominees" class="list-group" :group="'movies'" handle=".drag-handle">
-          <template #item="{ element, index }">
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-              <span>{{ index + 1 }}. {{ element.name }}</span>
-              <i class="bi bi-grip-vertical drag-handle" style="cursor: grab;"></i>
-            </div>
-          </template>
-        </draggable>
-        <div class="list-group-item list-group-item-secondary text-center my-2 p-1">
-          <p class="m-0">Drag movies you haven't seen down here</p>
-          <i class="bi bi-arrow-down mx-2"/>
-          <i class="bi bi-arrow-down mx-2"/>
-          <i class="bi bi-arrow-down mx-2"/>
-        </div>
-        <draggable v-model="award.unseenMovies" class="list-group" :group="'movies'" handle=".drag-handle" :class="{'dashed-border': award.unseenMovies.length === 0}">
+        <draggable v-model="award.seenMovies" class="list-group" :group="'movies'" handle=".drag-handle" :class="{'dashed-border': award.seenMovies.length === 0}">
           <template #item="{ element, index }">
             <div class="list-group-item d-flex justify-content-between align-items-center">
               <span>{{ index + 1 }}. {{ element.name }}</span>
@@ -27,8 +14,22 @@
             </div>
           </template>
           <template #footer>
-            <div v-if="award.unseenMovies.length === 0" class="list-group-item text-muted text-center">
-              Unseen Movies
+            <div v-if="award.seenMovies.length === 0" class="list-group-item text-muted text-center">
+              Seen Movies
+            </div>
+          </template>
+        </draggable>
+        <div class="list-group-item list-group-item-success text-center my-2 p-2">
+          <i class="bi bi-arrow-up mx-2"/>
+          <i class="bi bi-arrow-up mx-2"/>
+          <i class="bi bi-arrow-up mx-2"/>
+          <p class="m-0">Drag nominees you have seen up here and rank them.</p>
+        </div>
+        <draggable v-model="award.nominees" class="list-group" :group="'movies'" handle=".drag-handle">
+          <template #item="{ element }">
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <span>{{ element.name }}</span>
+              <i class="bi bi-grip-vertical drag-handle" style="cursor: grab;"></i>
             </div>
           </template>
         </draggable>
@@ -76,15 +77,16 @@ export default {
         ? Object.keys(awardsData).map((key) => ({
             key,
             name: awardsData[key].name,
+            description: awardsData[key].description,
             rank: awardsData[key].rank,
-            nominees: awardsData[key].years[this.yearToUse]
-              ? Object.keys(awardsData[key].years[this.yearToUse].nominees).map(
+            nominees: awardsData[key].years && awardsData[key].years[this.yearToUse]
+              ? Object.keys(awardsData[key].years[this.yearToUse].nominees || {}).map(
                   (nomineeKey) => ({
                     name: awardsData[key].years[this.yearToUse].nominees[nomineeKey].name,
                   })
                 )
               : [],
-            unseenMovies: []
+            seenMovies: []
           }))
         : [];
     },
@@ -99,8 +101,8 @@ export default {
       const userBallotRef = ref(db, `users/${userKey}/ballot`);
       const ballotData = this.awards.reduce((acc, award) => {
         acc[award.key] = {
-          ranked: award.nominees.map((nominee) => nominee.name),
-          unseen: award.unseenMovies.map((movie) => movie.name)
+          ranked: award.seenMovies.map((movie) => movie.name),
+          unseen: award.nominees.map((nominee) => nominee.name)
         };
         return acc;
       }, {});

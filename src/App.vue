@@ -27,6 +27,7 @@
           </ul>
         </div>
       </div>
+      <span class="version">{{version}}</span>
     </nav>
     <router-view class="p-3"/>
   </div>
@@ -36,7 +37,6 @@
 import { Collapse } from "bootstrap";
 import { auth } from "./assets/javascript/firebase.js";
 import { getDatabase, ref, get } from "firebase/database";
-import { computed } from "vue";
 import { useRoute } from "vue-router";
 
 const db = getDatabase();
@@ -58,7 +58,10 @@ export default {
   computed: {
     userIsAdmin() {
       return auth.currentUser ? this.adminUsers.includes(auth.currentUser.uid) : false;
-    }
+    },
+    version () {
+      return process.env.VUE_APP_VERSION;
+    },
   },
   methods: {
     async fetchAdminUsers() {
@@ -119,6 +122,7 @@ body, html {
 
 .navbar {
   background-color: $dark !important;
+  position: relative;
 
   .navbar-brand {
     color: white !important;
@@ -207,6 +211,14 @@ body, html {
         transform: rotate(-45deg) translate(-1px, -11px);
       }
     }
+  }
+
+  .version {
+    color: white;
+    font-size: 0.5rem;
+    left: 3px;
+    position: absolute;
+    top: 2px;
   }
 }
 

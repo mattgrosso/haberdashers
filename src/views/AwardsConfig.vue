@@ -7,14 +7,17 @@
       <ul class="list-group list-group-flush">
         <li class="list-group-item" v-for="award in awards" :key="award.key">
           <div class="d-flex flex-wrap">
-            <div class="name-and-description col-8">
+            <div class="name-and-description col-10">
               <h3>{{ award.name }}</h3>
               <p class="m-0">{{ award.description }}</p>
             </div>
-            <div class="add-year-button col-4">
+            <div class="edit-buttons col-2">
               <div class="d-flex justify-content-end">
                 <button class="btn btn-link btn-sm" @click="toggleYearInput(award)">
-                  <i class="bi bi-plus"></i>
+                  <i class="bi bi-plus"/>
+                </button>
+                <button class="btn btn-link btn-sm" @click="editCategory(award)">
+                  <i class="bi bi-pencil"></i>
                 </button>
               </div>
             </div>
@@ -70,13 +73,13 @@
     </div>
     <div class="d-flex justify-content-start mt-3">
       <button class="btn" :class="{'btn-primary': !showCategoryForm, 'btn-warning': showCategoryForm}" @click="toggleCategoryForm">
-        <span v-if="showCategoryForm">Hide Form</span>
+        <span v-if="showCategoryForm">{{ isEditing ? 'Cancel Edit' : 'Hide Form' }}</span>
         <span v-else>Add Category</span>
       </button>
     </div>
-    <div v-if="showCategoryForm" class="card mt-3">
+    <div v-if="showCategoryForm" class="card mt-3" ref="categoryForm">
       <div class="card-body">
-        <h5 class="card-title text-center">Add New Award Category</h5>
+        <h5 class="card-title text-center">{{ isEditing ? 'Edit Award Category' : 'Add New Award Category' }}</h5>
         <form>
           <div class="mb-3">
             <label for="newAwardName" class="form-label">Award Name</label>
@@ -86,7 +89,9 @@
             <label for="newAwardDescription" class="form-label">Award Description</label>
             <textarea class="form-control" id="newAwardDescription" v-model="newAwardDescription"></textarea>
           </div>
-          <button type="submit" class="btn btn-primary btn-block" @click.prevent="saveAward">Create Award</button>
+          <button type="submit" class="btn btn-primary btn-block" @click.prevent="isEditing ? updateAward() : saveAward()">
+            {{ isEditing ? 'Update Award' : 'Create Award' }}
+          </button>
         </form>
       </div>
     </div>
@@ -110,6 +115,9 @@ export default {
       newAwardDescription: "",
       awards: [],
       showCategoryForm: false,
+      isEditing: false,
+      editingAwardKey: null,
+      scrollPosition: 0,
     };
   },
   methods: {
@@ -134,6 +142,24 @@ export default {
         }
       } catch (error) {
         console.error("Error creating award:", error);
+      }
+    },
+    async updateAward() {
+      try {
+        const awardRef = ref(db, `awards/${this.editingAwardKey}`);
+        await update(awardRef, {
+          name: this.newAwardName,
+          description: this.newAwardDescription
+        });
+        this.newAwardName = "";
+        this.newAwardDescription = "";
+        this.showCategoryForm = false;
+        this.isEditing = false;
+        this.editingAwardKey = null;
+        this.fetchAwards();
+        window.scrollTo(0, this.scrollPosition);
+      } catch (error) {
+        console.error("Error updating award:", error);
       }
     },
     fetchAwards() {
@@ -193,6 +219,17 @@ export default {
         console.error("Error removing nominee:", error);
       }
     },
+    editCategory(award) {
+      this.newAwardName = award.name;
+      this.newAwardDescription = award.description;
+      this.showCategoryForm = true;
+      this.isEditing = true;
+      this.editingAwardKey = award.key;
+      this.scrollPosition = window.scrollY;
+      this.$nextTick(() => {
+        this.$refs.categoryForm.scrollIntoView({ behavior: 'smooth' });
+      });
+    },
     sortYears (years) {
       return years.sort((a, b) => {
         return b.year - a.year;
@@ -216,6 +253,13 @@ export default {
       return sorted;
     },
     toggleCategoryForm() {
+      if (this.isEditing) {
+        this.isEditing = false;
+        this.editingAwardKey = null;
+        this.newAwardName = "";
+        this.newAwardDescription = "";
+        window.scrollTo(0, this.scrollPosition);
+      }
       this.showCategoryForm = !this.showCategoryForm;
     },
     toggleYearCollapse(year) {
