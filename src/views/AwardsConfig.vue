@@ -42,12 +42,12 @@
                   </li>
                 </ol>
                 <div class="d-flex justify-content-end mt-2 my-4">
-                  <button class="btn btn-outline-success btn-sm" @click="toggleNomineeInput(award, year)">
+                  <button class="btn btn-outline-success btn-sm" @click="toggleNomineeInput(year, award)">
                     <span>add nominee</span>
                   </button>
                 </div>
                 <div v-if="year.showNomineeInput" class="input-group my-3 d-flex justify-content-end">
-                  <input :ref="`${award.name}-${year.year}-newNominee`" type="text" class="form-control-sm" placeholder="Add Nominee" @keyup.enter="addNomineeTo(award, year)">
+                  <input v-model="year.newNominee" :ref="`${award.name}-${year.year}-newNominee`" type="text" class="form-control-sm" placeholder="Add Nominee" @keyup.enter="addNomineeTo(award, year)">
                   <button class="btn btn-secondary btn-sm" @click="addNomineeTo(award, year)">Add Nominee</button>
                 </div>
               </div>
@@ -177,6 +177,7 @@ export default {
             year,
             nominees: awardsData[key].years[year].nominees || [],
             showNomineeInput: false,
+            newNominee: "", // Add local state for new nominee input
             isOpen: parseInt(year) === parseInt(previousYear) && parseInt(currentMonth) < 4
           })) : []
         })).sort((a, b) => a.rank - b.rank) : [];
@@ -195,25 +196,28 @@ export default {
       }
       yearInput.value = "";
     },
-    toggleNomineeInput(award, year) {
+    toggleNomineeInput(year, award) {
       year.showNomineeInput = !year.showNomineeInput;
       if (year.showNomineeInput) {
         this.$nextTick(() => {
-          this.$refs[`${award.name}-${year.year}-newNominee`][0].focus();
+          const inputRef = this.$refs[`${award.name}-${year.year}-newNominee`];
+          if (inputRef && inputRef[0]) {
+            inputRef[0].focus();
+          }
         });
       }
     },
     async addNomineeTo(award, year) {
-      let nomineeInput = this.$refs[`${award.name}-${year.year}-newNominee`][0];
-      let nominee = nomineeInput.value;
+      let nominee = year.newNominee;
       if (nominee) {
         const awardRef = ref(db, `awards/${award.key}/years/${year.year}/nominees/${nominee}`);
         await set(awardRef, {
           name: nominee
         });
+        year.newNominee = ""; // Clear the local state for new nominee input
+        year.showNomineeInput = false; // Hide the input field
         this.fetchAwards();
       }
-      nomineeInput.value = "";
     },
     async removeNominee(award, year, nominee) {
       try {
