@@ -47,8 +47,8 @@
                   </button>
                 </div>
                 <div v-if="year.showNomineeInput" class="input-group my-3 d-flex justify-content-end">
-                  <input :ref="`${award.name}-${year.year}-newNominee`" type="text" class="form-control-sm" placeholder="Add Nominee">
-                  <button class="btn btn-secondary btn-sm" @click="addNomineeTo(award, year.year)">Add Nominee</button>
+                  <input :ref="`${award.name}-${year.year}-newNominee`" type="text" class="form-control-sm" placeholder="Add Nominee" @keyup.enter="addNomineeTo(award, year)">
+                  <button class="btn btn-secondary btn-sm" @click="addNomineeTo(award, year)">Add Nominee</button>
                 </div>
               </div>
             </li>
@@ -197,12 +197,17 @@ export default {
     },
     toggleNomineeInput(award, year) {
       year.showNomineeInput = !year.showNomineeInput;
+      if (year.showNomineeInput) {
+        this.$nextTick(() => {
+          this.$refs[`${award.name}-${year.year}-newNominee`][0].focus();
+        });
+      }
     },
     async addNomineeTo(award, year) {
-      let nomineeInput = this.$refs[`${award.name}-${year}-newNominee`][0];
+      let nomineeInput = this.$refs[`${award.name}-${year.year}-newNominee`][0];
       let nominee = nomineeInput.value;
       if (nominee) {
-        const awardRef = ref(db, `awards/${award.key}/years/${year}/nominees/${nominee}`);
+        const awardRef = ref(db, `awards/${award.key}/years/${year.year}/nominees/${nominee}`);
         await set(awardRef, {
           name: nominee
         });
