@@ -64,6 +64,12 @@ export default {
       return [...this.awards].sort((a, b) => a.rank - b.rank);
     },
   },
+  watch: {
+    awards: {
+      handler: 'saveBallot',
+      deep: true
+    }
+  },
   methods: {
     async fetchAwards() {
       const awardsRef = ref(db, "awards");
@@ -73,21 +79,37 @@ export default {
       const currentMonth = new Date().getMonth() + 1;
       this.yearToUse = currentMonth < 4 ? currentYear - 1 : currentYear;
 
+      const user = auth.currentUser;
+      if (!user) {
+        console.error("User not authenticated");
+        return;
+      }
+
+      const userKey = `${user.displayName.replace(/\s+/g, '_')}_${user.uid}`;
+      const userBallotRef = ref(db, `users/${userKey}/ballot`);
+      const userBallotSnapshot = await get(userBallotRef);
+      const userBallotData = userBallotSnapshot.val() || {};
+
       this.awards = awardsData
-        ? Object.keys(awardsData).map((key) => ({
-            key,
-            name: awardsData[key].name,
-            description: awardsData[key].description,
-            rank: awardsData[key].rank,
-            nominees: awardsData[key].years && awardsData[key].years[this.yearToUse]
-              ? Object.keys(awardsData[key].years[this.yearToUse].nominees || {}).map(
-                  (nomineeKey) => ({
-                    name: awardsData[key].years[this.yearToUse].nominees[nomineeKey].name,
-                  })
-                )
-              : [],
-            seenMovies: []
-          }))
+        ? Object.keys(awardsData).map((key) => {
+            const award = awardsData[key];
+            const userAwardData = userBallotData[key] || { ranked: [], unseen: [] };
+            const rankedSet = new Set(userAwardData.ranked || []);
+            return {
+              key,
+              name: award.name,
+              description: award.description,
+              rank: award.rank,
+              nominees: award.years && award.years[this.yearToUse]
+                ? Object.keys(award.years[this.yearToUse].nominees || {}).map(
+                    (nomineeKey) => ({
+                      name: award.years[this.yearToUse].nominees[nomineeKey].name,
+                    })
+                  ).filter(nominee => !rankedSet.has(nominee.name))
+                : [],
+              seenMovies: (userAwardData.ranked || []).map(name => ({ name }))
+            };
+          })
         : [];
     },
     async saveBallot() {
