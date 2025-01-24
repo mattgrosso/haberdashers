@@ -21,6 +21,9 @@
             <li v-if="userIsAdmin" class="nav-item text-center">
               <router-link class="nav-link text-white" to="/admin" @click="handleNavClick">Awards Config</router-link>
             </li>
+            <li v-if="userIsAdmin" class="nav-item text-center">
+              <router-link class="nav-link text-white" to="/ballot-management" @click="handleNavClick">Ballot Management</router-link>
+            </li>
             <li class="nav-item text-center">
               <a class="nav-link text-white" href="#" @click="logout">Logout</a>
             </li>
