@@ -238,7 +238,7 @@ export default {
     clearSearchResults () {
       this.searchResults = [];
     },
-    hideImage(event) {
+    hideImage (event) {
       event.target.style.visibility = 'hidden';
     },
     toggleMovieSelection (movie) {
