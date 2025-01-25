@@ -12,20 +12,20 @@
               <div class="list-group-item d-flex justify-content-between align-items-center">
                 <span>{{ index + 1 }}. {{ element.name }}</span>
                 <div>
-                  <i class="bi bi-x-circle me-2" @click="removeMovieFromList(element, award)"></i>
+                  <i class="bi bi-x-circle me-2" @click="removeMovieFromList(element, award)" style="cursor: pointer;"></i>
                   <i class="bi bi-grip-vertical drag-handle" style="cursor: grab;"></i>
                 </div>
               </div>
             </template>
           </draggable>
-          <div class="legacy-award-explanation mb-3">
-            <p>Please select and rank up to ten movies from {{yearToUse - 25}} that you have seen and would like to nominate for this award.</p>
+          <div class="legacy-award-explanation list-group-item list-group-item-success text-center my-2 p-2">
+            <p class="m-0">Please select and rank up to ten movies from {{yearToUse - 25}} that you believe have had an undeniable impact on society and cinema.</p>
           </div>
           <div class="search-bar mb-3" @click="clearSearchResults" @blur="clearSearchResults">
             <input
               type="text"
               class="form-control"
-              :placeholder="`Search for a movie from ${yearToUse - 25} or browse below...`"
+              :placeholder="`Search in ${yearToUse - 25} or select below...`"
               v-model="searchQuery"
               @input="debouncedSearch"
             />
@@ -88,9 +88,6 @@
           </draggable>
         </div>
       </div>
-    </div>
-    <div class="d-flex justify-content-center mt-5">
-      <button class="btn btn-success text-light" @click="saveBallot">Save Ballot</button>
     </div>
     <!-- Toast Notification -->
     <div v-if="showToast" class="toast align-items-center p-1" :class="{show: showToast}" role="alert" aria-live="assertive" aria-atomic="true">
