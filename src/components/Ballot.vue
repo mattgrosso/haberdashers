@@ -173,11 +173,11 @@ export default {
             description: award.description,
             rank: award.rank,
             nominees: award.years && award.years[this.yearToUse]
-              ? Object.keys(award.years[this.yearToUse].nominees || {}).map(
+              ? this.shuffleArray(Object.keys(award.years[this.yearToUse].nominees || {}).map(
                 (nomineeKey) => ({
                   name: award.years[this.yearToUse].nominees[nomineeKey].name,
                 })
-              ).filter(nominee => !rankedSet.has(nominee.name))
+              ).filter(nominee => !rankedSet.has(nominee.name)))
               : [],
             seenMovies: (userAwardData.ranked || []).map(name => ({ name }))
           };
@@ -316,6 +316,13 @@ export default {
     handleScroll () {
       const element = this.$refs.legacyPosters;
       this.showScrollIndicator = element.scrollTop === 0;
+    },
+    shuffleArray (array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
     }
   },
   mounted () {
