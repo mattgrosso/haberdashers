@@ -34,7 +34,7 @@
               </div>
               <div v-if="year.isOpen">
                 <ol class="list-group list-group-numbered my-2">
-                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(nominee, index) in alphabetizedNominees(year.nominees)" :key="index">
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(nominee, index) in year.nominees" :key="index">
                     {{nominee.name}}
                     <button class="btn btn-link btn-sm text-danger" @click="removeNominee(award, year.year, nominee.name)">
                       <i class="bi bi-trash"></i>
@@ -42,8 +42,11 @@
                   </li>
                 </ol>
                 <div class="d-flex justify-content-end mt-2 my-4">
-                  <button class="btn btn-outline-success btn-sm" @click="toggleNomineeInput(year, award)">
+                  <button class="btn btn-outline-success btn-sm mr-3" @click="toggleNomineeInput(year, award)">
                     <span>add nominee</span>
+                  </button>
+                  <button v-if="year.nominees.length" class="btn btn-outline-secondary btn-sm ms-2" @click="alphabetizeNominees(year)">
+                    <span>alphabetize nominees</span>
                   </button>
                 </div>
                 <div v-if="year.showNomineeInput" class="input-group my-3 d-flex justify-content-end">
@@ -175,7 +178,7 @@ export default {
           showYearInput: false,
           years: awardsData[key].years ? Object.keys(awardsData[key].years).map((year) => ({
             year,
-            nominees: awardsData[key].years[year].nominees || [],
+            nominees: awardsData[key].years[year].nominees ? Object.values(awardsData[key].years[year].nominees) : [],
             showNomineeInput: false,
             newNominee: "", // Add local state for new nominee input
             isOpen: parseInt(year) === parseInt(previousYear) && parseInt(currentMonth) < 4
@@ -244,22 +247,8 @@ export default {
         return b.year - a.year;
       });
     },
-    alphabetizedNominees (nominees) {
-      const nomineesArray = Object.keys(nominees).map(key => ({
-        ...nominees[key]
-      }));
-
-      const sorted = nomineesArray.sort((a, b) => {
-        if (a.name < b.name) {
-          return -1;
-        }
-        if (a.name > b.name) {
-          return 1;
-        }
-        return 0;
-      });
-
-      return sorted;
+    alphabetizeNominees (year) {
+      year.nominees.sort((a, b) => a.name.localeCompare(b.name));
     },
     toggleCategoryForm() {
       if (this.isEditing) {

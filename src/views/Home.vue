@@ -13,6 +13,7 @@
 </template>
 
 <script>
+import axios from "axios";
 import { auth } from "../assets/javascript/firebase.js";
 import Ballot from "../components/Ballot.vue";
 

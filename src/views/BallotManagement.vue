@@ -54,45 +54,121 @@ export default {
       }
     },
     async evaluateBallots() {
-      const ballotsRef = ref(db, "users");
-      const snapshot = await get(ballotsRef);
-      const ballotsData = snapshot.val();
+      const usersRef = ref(db, "users");
+      const snapshot = await get(usersRef);
+      const users = snapshot.val();
 
-      if (ballotsData) {
-        const categoryResults = {};
+      const results = {};
+      const categories = new Set();
 
-        // Iterate over each user's ballot
-        Object.values(ballotsData).forEach(user => {
-          Object.entries(user.ballot || {}).forEach(([category, ballot]) => {
-            if (!categoryResults[category]) {
-              categoryResults[category] = {};
+      // Collect all categories
+      for (const user of Object.values(users)) {
+        if (!user.ballot) continue;
+        for (const category of Object.keys(user.ballot)) {
+          categories.add(category);
+        }
+      }
+
+      // Process each category
+      for (const category of categories) {
+        const rankedBallots = [];
+        const nomineeSet = new Set();
+
+        // Gather ranked ballots and all unique nominees
+        for (const user of Object.values(users)) {
+          const catInfo = user.ballot?.[category];
+          if (catInfo?.ranked) {
+            rankedBallots.push(catInfo.ranked);
+            catInfo.ranked.forEach(n => nomineeSet.add(n));
+          }
+        }
+
+        const nominees = [...nomineeSet];
+        if (nominees.length === 0) continue;
+
+        // Step A: pairwise preferences d(A,B)
+        const d = {};
+        nominees.forEach(a => {
+          d[a] = {};
+          nominees.forEach(b => {
+            if (a !== b) d[a][b] = 0;
+          });
+        });
+
+        for (const ballot of rankedBallots) {
+          for (let i = 0; i < ballot.length; i++) {
+            for (let j = i + 1; j < ballot.length; j++) {
+              d[ballot[i]][ballot[j]] += 1;
             }
-            // Normalize points based on the number of ranked nominees
-            const totalRanked = (ballot.ranked || []).length;
-            (ballot.ranked || []).forEach((nominee, index) => {
-              if (!categoryResults[category][nominee]) {
-                categoryResults[category][nominee] = 0;
-              }
-              // Add normalized points
-              categoryResults[category][nominee] += (totalRanked - index) / totalRanked;
+          }
+        }
+
+        // Step B: compute strongest paths D(A,B)
+        const D = {};
+        nominees.forEach(a => {
+          D[a] = {};
+          nominees.forEach(b => {
+            D[a][b] = 0;
+          });
+        });
+
+        // If d(A,B) > d(B,A), set D(A,B) = d(A,B)
+        nominees.forEach(a => {
+          nominees.forEach(b => {
+            if (a !== b && d[a][b] > d[b][a]) {
+              D[a][b] = d[a][b];
+            }
+          });
+        });
+
+        // Floyd–Warshall-like update
+        nominees.forEach(i => {
+          nominees.forEach(j => {
+            if (i === j) return;
+            nominees.forEach(k => {
+              if (i === k || j === k) return;
+              D[j][k] = Math.max(D[j][k], Math.min(D[j][i], D[i][k]));
             });
           });
         });
 
-        // Determine the winner for each category and include all nominees' scores
-        this.winners = Object.entries(categoryResults).map(([category, nominees]) => {
-          const sortedNominees = Object.entries(nominees).sort((a, b) => b[1] - a[1]).map(([name, score]) => ({ name, score }));
-          return {
-            category,
-            nominee: sortedNominees[0].name,
-            nominees: sortedNominees
-          };
+        // Step C: build a ranking rather than just picking winners
+        // 1. For each nominee, count how many others it "beats"
+        //    (i.e., D(a,b) > D(b,a)).
+        const beatsCount = {};
+        nominees.forEach(a => {
+          let count = 0;
+          for (const b of nominees) {
+            if (b !== a && D[a][b] > D[b][a]) count++;
+          }
+          beatsCount[a] = count;
         });
 
-        console.log("Winners:", this.winners);
-      } else {
-        alert("No ballots found.");
+        // 2. Sort nominees by descending beatsCount
+        const sorted = [...nominees].sort((x, y) => beatsCount[y] - beatsCount[x]);
+
+        // 3. Assign ranks: ties get the same rank, skip subsequent ranks
+        const categoryResult = {};
+        let currentRank = 1;
+        let numProcessed = 0;
+        let previousScore = null;
+
+        for (let i = 0; i < sorted.length; i++) {
+          const nominee = sorted[i];
+          const score = beatsCount[nominee];
+          if (previousScore !== null && score < previousScore) {
+            currentRank = numProcessed + 1; 
+          }
+          categoryResult[nominee] = currentRank;
+          previousScore = score;
+          numProcessed++;
+        }
+
+        // Store final ranking for this category
+        results[category] = categoryResult;
       }
+      console.log(results);
+      // return results;
     },
     toTitleCase(str) {
       return str
