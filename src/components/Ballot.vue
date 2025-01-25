@@ -93,7 +93,7 @@
     <div v-if="showToast" class="toast align-items-center p-1" :class="{show: showToast}" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
         <div class="toast-body">
-          Ballot saved successfully!
+          {{ toastMessage }}
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="showToast = false" aria-label="Close"></button>
       </div>
@@ -128,6 +128,7 @@ export default {
       observer: null,
       showScrollIndicator: true,
       showToast: false,
+      toastMessage: "", // State for the toast message
       pageLoadedTime: null
     };
   },
@@ -239,6 +240,10 @@ export default {
       if (this.selectedLegacyMovies.length < 10 && !this.isSelected(movie)) {
         this.selectedLegacyMovies.push(movie);
         this.updateLegacyAward();
+      } else if (this.isSelected(movie)) {
+        this.showToastMessage("This movie is already in your selection.");
+      } else {
+        this.showToastMessage("You can only select up to 10 movies.");
       }
       this.searchQuery = "";
       this.searchResults = [];
@@ -255,7 +260,7 @@ export default {
         if (this.selectedLegacyMovies.length < 10) {
           this.selectedLegacyMovies.push(movie);
         } else {
-          alert("You can only select up to 10 movies.");
+          this.showToastMessage("You can only select up to 10 movies.");
         }
       } else {
         this.selectedLegacyMovies.splice(index, 1);
@@ -293,7 +298,9 @@ export default {
       const userBallotRef = ref(db, `users/${userKey}/ballot`);
       const ballotData = this.awards.reduce((acc, award) => {
         acc[award.key] = {
-          ranked: award.seenMovies.map((movie) => movie.name),
+          ranked: award.seenMovies
+            .filter(movie => movie.name) // Filter out invalid movie objects
+            .map((movie) => movie.name),
           unseen: award.nominees.map((nominee) => nominee.name)
         };
         return acc;
@@ -304,10 +311,7 @@ export default {
         console.log("Ballot saved successfully");
         const currentTime = new Date().getTime();
         if (currentTime - this.pageLoadedTime >= 5000) {
-          this.showToast = true; // Show the toast notification
-          setTimeout(() => {
-            this.showToast = false; // Hide the toast notification after 3 seconds
-          }, 1000);
+          this.showToastMessage("Ballot saved successfully!");
         }
       } catch (error) {
         console.error("Error saving ballot:", error);
@@ -323,6 +327,13 @@ export default {
         [array[i], array[j]] = [array[j], array[i]];
       }
       return array;
+    },
+    showToastMessage (message) {
+      this.toastMessage = message;
+      this.showToast = true;
+      setTimeout(() => {
+        this.showToast = false;
+      }, 3000);
     }
   },
   mounted () {
