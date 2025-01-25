@@ -112,7 +112,7 @@ export default {
   components: {
     draggable,
   },
-  data() {
+  data () {
     return {
       newAwardName: "",
       newAwardDescription: "",
@@ -124,7 +124,7 @@ export default {
     };
   },
   methods: {
-    async saveAward() {
+    async saveAward () {
       try {
         const awardKey = this.newAwardName.replace(/\s+/g, '_');
         const awardRef = ref(db, `awards/${awardKey}`);
@@ -147,7 +147,7 @@ export default {
         console.error("Error creating award:", error);
       }
     },
-    async updateAward() {
+    async updateAward () {
       try {
         const awardRef = ref(db, `awards/${this.editingAwardKey}`);
         await update(awardRef, {
@@ -165,7 +165,7 @@ export default {
         console.error("Error updating award:", error);
       }
     },
-    fetchAwards() {
+    fetchAwards () {
       const awardsRef = ref(db, 'awards');
       onValue(awardsRef, (snapshot) => {
         const awardsData = snapshot.val();
@@ -186,12 +186,12 @@ export default {
         })).sort((a, b) => a.rank - b.rank) : [];
       });
     },
-    toggleYearInput(award) {
+    toggleYearInput (award) {
       award.showYearInput = !award.showYearInput;
     },
-    async addYearTo(award) {
-      let yearInput = this.$refs[`${award.name}-newYearInput`][0];
-      let year = yearInput.value;
+    async addYearTo (award) {
+      const yearInput = this.$refs[`${award.name}-newYearInput`][0];
+      const year = yearInput.value;
       if (year) {
         const awardRef = ref(db, `awards/${award.key}/years/${year}`);
         await set(awardRef, { year: year, nominees: [] });
@@ -199,7 +199,7 @@ export default {
       }
       yearInput.value = "";
     },
-    toggleNomineeInput(year, award) {
+    toggleNomineeInput (year, award) {
       year.showNomineeInput = !year.showNomineeInput;
       if (year.showNomineeInput) {
         this.$nextTick(() => {
@@ -210,8 +210,8 @@ export default {
         });
       }
     },
-    async addNomineeTo(award, year) {
-      let nominee = year.newNominee;
+    async addNomineeTo (award, year) {
+      const nominee = year.newNominee;
       if (nominee) {
         const awardRef = ref(db, `awards/${award.key}/years/${year.year}/nominees/${nominee}`);
         await set(awardRef, {
@@ -222,7 +222,7 @@ export default {
         this.fetchAwards();
       }
     },
-    async removeNominee(award, year, nominee) {
+    async removeNominee (award, year, nominee) {
       try {
         const nomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${nominee}`);
         await remove(nomineeRef);
@@ -231,7 +231,7 @@ export default {
         console.error("Error removing nominee:", error);
       }
     },
-    editCategory(award) {
+    editCategory (award) {
       this.newAwardName = award.name;
       this.newAwardDescription = award.description;
       this.showCategoryForm = true;
@@ -250,7 +250,7 @@ export default {
     alphabetizeNominees (year) {
       year.nominees.sort((a, b) => a.name.localeCompare(b.name));
     },
-    toggleCategoryForm() {
+    toggleCategoryForm () {
       if (this.isEditing) {
         this.isEditing = false;
         this.editingAwardKey = null;
@@ -260,10 +260,10 @@ export default {
       }
       this.showCategoryForm = !this.showCategoryForm;
     },
-    toggleYearCollapse(year) {
+    toggleYearCollapse (year) {
       year.isOpen = !year.isOpen;
     },
-    async updateCategoryOrder() {
+    async updateCategoryOrder () {
       const updates = {};
       this.awards.forEach((award, index) => {
         updates[`/awards/${award.key}/rank`] = index;
@@ -275,7 +275,7 @@ export default {
       }
     }
   },
-  created() {
+  created () {
     this.fetchAwards();
   }
 };

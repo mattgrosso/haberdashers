@@ -18,6 +18,29 @@
               </div>
             </template>
           </draggable>
+          <div class="legacy-award-explanation mb-3">
+            <p>Please select and rank up to ten movies from {{yearToUse - 25}} that you have seen and would like to nominate for this award.</p>
+          </div>
+          <div class="search-bar mb-3" @click="clearSearchResults" @blur="clearSearchResults">
+            <input
+              type="text"
+              class="form-control"
+              :placeholder="`Search for a movie from ${yearToUse - 25} or browse below...`"
+              v-model="searchQuery"
+              @input="debouncedSearch"
+            />
+            <ul v-if="searchResults.length" class="list-group mt-2 autocomplete-list">
+              <li
+                v-for="movie in searchResults"
+                :key="movie.id"
+                class="list-group-item autocomplete-item"
+                @click="addMovieToSelection(movie)"
+              >
+                <img :src="`https://image.tmdb.org/t/p/w92${movie.poster_path}`" :alt="movie.title" class="autocomplete-poster" @error="hideImage($event)">
+                {{ movie.title }}
+              </li>
+            </ul>
+          </div>
           <div class="legacy-posters" ref="legacyPosters" @scroll="handleScroll">
             <div class="legacy-award-grid" ref="legacyGrid">
               <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" :class="{'selected': isSelected(movie)}" @click="toggleMovieSelection(movie)">
@@ -28,7 +51,7 @@
               </div>
             </div>
             <div class="load-more-button d-flex justify-content-center mt-3">
-              <button class="btn btn-outline-primary" @click="fetchLegacyMovies" :disabled="currentPage > totalPages">Load More</button>
+              <button class="btn btn-outline-primary" @click="fetchLegacyMovies" :disabled="currentPage > totalPages">{{`Load More Movies from ${yearToUse - 25}`}}</button>
             </div>
             <div v-if="showScrollIndicator" class="scroll-indicator">
               <i class="bi bi-chevron-down"></i>
@@ -77,6 +100,7 @@ import draggable from "vuedraggable";
 import axios from "axios";
 import { getDatabase, ref, get, set } from "firebase/database";
 import { auth } from "../assets/javascript/firebase.js";
+import debounce from "lodash/debounce";
 
 const db = getDatabase();
 
@@ -85,12 +109,14 @@ export default {
   components: {
     draggable,
   },
-  data() {
+  data () {
     return {
       awards: [],
       yearToUse: null,
       legacyMovies: [],
       selectedLegacyMovies: [],
+      searchQuery: "",
+      searchResults: [],
       currentPage: 1,
       totalPages: 1,
       observer: null,
@@ -98,7 +124,7 @@ export default {
     };
   },
   computed: {
-    sortedAwards() {
+    sortedAwards () {
       return [...this.awards].sort((a, b) => a.rank - b.rank);
     },
   },
@@ -109,7 +135,7 @@ export default {
     }
   },
   methods: {
-    async fetchAwards() {
+    async fetchAwards () {
       const awardsRef = ref(db, "awards");
       const snapshot = await get(awardsRef);
       const awardsData = snapshot.val();
@@ -130,31 +156,31 @@ export default {
 
       this.awards = awardsData
         ? Object.keys(awardsData).map((key) => {
-            const award = awardsData[key];
-            const userAwardData = userBallotData[key] || { ranked: [], unseen: [] };
-            const rankedSet = new Set(userAwardData.ranked || []);
-            return {
-              key,
-              name: award.name,
-              description: award.description,
-              rank: award.rank,
-              nominees: award.years && award.years[this.yearToUse]
-                ? Object.keys(award.years[this.yearToUse].nominees || {}).map(
-                    (nomineeKey) => ({
-                      name: award.years[this.yearToUse].nominees[nomineeKey].name,
-                    })
-                  ).filter(nominee => !rankedSet.has(nominee.name))
-                : [],
-              seenMovies: (userAwardData.ranked || []).map(name => ({ name }))
-            };
-          })
+          const award = awardsData[key];
+          const userAwardData = userBallotData[key] || { ranked: [], unseen: [] };
+          const rankedSet = new Set(userAwardData.ranked || []);
+          return {
+            key,
+            name: award.name,
+            description: award.description,
+            rank: award.rank,
+            nominees: award.years && award.years[this.yearToUse]
+              ? Object.keys(award.years[this.yearToUse].nominees || {}).map(
+                (nomineeKey) => ({
+                  name: award.years[this.yearToUse].nominees[nomineeKey].name,
+                })
+              ).filter(nominee => !rankedSet.has(nominee.name))
+              : [],
+            seenMovies: (userAwardData.ranked || []).map(name => ({ name }))
+          };
+        })
         : [];
 
       // Fetch legacy movies for "The Haberdasher Legacy Award"
       await this.fetchLegacyMovies();
       this.loadSelectedLegacyMovies();
     },
-    async fetchLegacyMovies() {
+    async fetchLegacyMovies () {
       if (this.currentPage > this.totalPages) return;
 
       try {
@@ -176,7 +202,7 @@ export default {
         console.error("Error fetching legacy movies:", error);
       }
     },
-    loadSelectedLegacyMovies() {
+    loadSelectedLegacyMovies () {
       const legacyAward = this.awards.find(award => award.name === "The Haberdasher Legacy Award");
       if (legacyAward) {
         this.selectedLegacyMovies = legacyAward.seenMovies.map(movie => {
@@ -185,7 +211,37 @@ export default {
         });
       }
     },
-    toggleMovieSelection(movie) {
+    async searchMovies () {
+      if (!this.searchQuery) {
+        this.searchResults = [];
+        return;
+      }
+
+      try {
+        const response = await axios.get(`https://api.themoviedb.org/3/search/movie?api_key=${process.env.VUE_APP_TMDB_API_KEY}&query=${this.searchQuery}&year=${this.yearToUse - 25}`);
+        this.searchResults = response.data.results;
+      } catch (error) {
+        console.error("Error searching for movies:", error);
+      }
+    },
+    debouncedSearch: debounce(function () {
+      this.searchMovies();
+    }, 300),
+    addMovieToSelection (movie) {
+      if (this.selectedLegacyMovies.length < 10 && !this.isSelected(movie)) {
+        this.selectedLegacyMovies.push(movie);
+        this.updateLegacyAward();
+      }
+      this.searchQuery = "";
+      this.searchResults = [];
+    },
+    clearSearchResults () {
+      this.searchResults = [];
+    },
+    hideImage(event) {
+      event.target.style.visibility = 'hidden';
+    },
+    toggleMovieSelection (movie) {
       const index = this.selectedLegacyMovies.findIndex(m => m.id === movie.id);
       if (index === -1) {
         if (this.selectedLegacyMovies.length < 10) {
@@ -198,16 +254,16 @@ export default {
       }
       this.updateLegacyAward();
     },
-    isSelected(movie) {
+    isSelected (movie) {
       return this.selectedLegacyMovies.some(m => m.id === movie.id);
     },
-    updateLegacyAward() {
+    updateLegacyAward () {
       const legacyAward = this.awards.find(award => award.name === "The Haberdasher Legacy Award");
       if (legacyAward) {
         legacyAward.seenMovies = this.selectedLegacyMovies.map(movie => ({ name: movie.title }));
       }
     },
-    removeMovieFromList(movie, award) {
+    removeMovieFromList (movie, award) {
       const index = this.selectedLegacyMovies.findIndex(m => m.title === movie.name);
       if (index !== -1) {
         this.selectedLegacyMovies.splice(index, 1);
@@ -218,7 +274,7 @@ export default {
         award.seenMovies.splice(seenMovieIndex, 1);
       }
     },
-    async saveBallot() {
+    async saveBallot () {
       const user = auth.currentUser;
       if (!user) {
         console.error("User not authenticated");
@@ -242,12 +298,12 @@ export default {
         console.error("Error saving ballot:", error);
       }
     },
-    handleScroll() {
+    handleScroll () {
       const element = this.$refs.legacyPosters;
       this.showScrollIndicator = element.scrollTop === 0;
     }
   },
-  mounted() {
+  mounted () {
     this.fetchAwards();
   }
 };
@@ -267,6 +323,43 @@ export default {
 
   .dashed-border {
     border: 2px dashed #ccc;
+  }
+
+  .search-bar {
+    position: relative;
+
+    .list-group {
+      position: absolute;
+      width: 100%;
+      z-index: 1000;
+    }
+
+    .autocomplete-list {
+      background-color: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .autocomplete-item {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .autocomplete-item:hover {
+      background-color: #f0f0f0;
+    }
+
+    .autocomplete-poster {
+      width: 50px;
+      height: 75px; /* Set a fixed height for the images */
+      margin-right: 10px;
+    }
+  }
+
+  .legacy-award-explanation {
+    font-size: 0.9rem;
+    color: #555;
   }
 
   .legacy-posters {

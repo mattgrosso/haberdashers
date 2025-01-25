@@ -13,14 +13,14 @@ const routes = [
     path: "/",
     component: Home,
     meta: {
-      requiresAuth: true 
+      requiresAuth: true
     }
   },
-  { 
-    path: "/login", 
+  {
+    path: "/login",
     component: Login,
     meta: {
-      requiresAuth: false 
+      requiresAuth: false
     }
   },
   {

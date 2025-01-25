@@ -23,12 +23,12 @@ export default {
     Ballot,
   },
   computed: {
-    userName() {
+    userName () {
       return auth.currentUser ? auth.currentUser.displayName : null;
     },
   },
   methods: {
-    async logout() {
+    async logout () {
       try {
         await auth.signOut();
         this.$router.push("/login");

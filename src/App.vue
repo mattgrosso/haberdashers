@@ -46,20 +46,20 @@ const db = getDatabase();
 
 export default {
   name: "App",
-  data() {
+  data () {
     return {
       isNavbarCollapsed: true,
       showNavbar: true,
       adminUsers: [] // Initialize adminUsers as an empty array
     };
   },
-  async mounted() {
+  async mounted () {
     const route = useRoute();
     this.showNavbar = route.path !== "/login";
     await this.fetchAdminUsers();
   },
   computed: {
-    userIsAdmin() {
+    userIsAdmin () {
       return auth.currentUser ? this.adminUsers.includes(auth.currentUser.uid) : false;
     },
     version () {
@@ -67,7 +67,7 @@ export default {
     },
   },
   methods: {
-    async fetchAdminUsers() {
+    async fetchAdminUsers () {
       try {
         const adminRef = ref(db, "admins");
         const snapshot = await get(adminRef);
@@ -80,10 +80,10 @@ export default {
         console.error("Error fetching admin users:", error);
       }
     },
-    handleNavClick() {
+    handleNavClick () {
       this.collapseNavbar();
     },
-    toggleNavbar() {
+    toggleNavbar () {
       const navbar = document.getElementById("navbarNav");
       const bsCollapse = new Collapse(navbar, {
         toggle: false
@@ -95,7 +95,7 @@ export default {
       }
       this.isNavbarCollapsed = !this.isNavbarCollapsed;
     },
-    collapseNavbar() {
+    collapseNavbar () {
       const navbar = document.getElementById("navbarNav");
       const bsCollapse = new Collapse(navbar, {
         toggle: false
@@ -103,7 +103,7 @@ export default {
       bsCollapse.hide();
       this.isNavbarCollapsed = true;
     },
-    async logout() {
+    async logout () {
       try {
         await auth.signOut();
         this.collapseNavbar();
@@ -144,11 +144,11 @@ body, html {
     .nav-item {
       .nav-link {
         color: white !important;
-    
+
         &:hover {
           color: $warning !important;
         }
-    
+
         &.active {
           color: $warning !important;
         }

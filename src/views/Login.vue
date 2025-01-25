@@ -22,7 +22,7 @@ const db = getDatabase();
 export default {
   name: "Login",
   methods: {
-    async loginWithGoogle() {
+    async loginWithGoogle () {
       try {
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
@@ -32,7 +32,7 @@ export default {
         console.error("Error logging in:", error);
       }
     },
-    async checkAndCreateUser(user) {
+    async checkAndCreateUser (user) {
       const userKey = `${user.displayName.replace(/\s+/g, '_')}_${user.uid}`;
       const userRef = ref(db, `users/${userKey}`);
       const userSnap = await get(userRef);
