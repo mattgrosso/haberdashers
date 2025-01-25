@@ -314,7 +314,6 @@ export default {
 
       try {
         await set(userBallotRef, ballotData);
-        console.log("Ballot saved successfully");
         const currentTime = new Date().getTime();
         if (currentTime - this.pageLoadedTime >= 5000) {
           this.showToastMessage("Ballot saved successfully!");
