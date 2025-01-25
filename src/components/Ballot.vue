@@ -45,8 +45,8 @@
             <div class="legacy-award-grid" ref="legacyGrid">
               <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" :class="{'selected': isSelected(movie)}" @click="toggleMovieSelection(movie)">
                 <img :src="`https://image.tmdb.org/t/p/w200${movie.poster_path}`" :alt="movie.title">
-                <div v-if="isSelected(movie)" class="checkmark">
-                  <i class="bi bi-check-circle-fill"></i>
+                <div v-if="isSelected(movie)" class="overlay">
+                  <i class="bi bi-check-circle-fill checkmark"></i>
                 </div>
               </div>
             </div>
@@ -411,32 +411,29 @@ export default {
     position: relative;
     cursor: pointer;
     border: 4px solid transparent;
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+      padding: 5px;
+    }
+
+    .checkmark {
+      color: white;
+      font-size: 1.5rem;
+    }
   }
 
   .movie-poster img {
     width: 100%;
     height: auto;
-  }
-
-  .movie-poster.selected {
-    border-color: #49b429;
-    padding: 6px;
-  }
-
-  .checkmark {
-    align-items: center;
-    background-color: rgb(255, 255, 255);
-    border-radius: 50%;
-    color: #49b429;
-    display: flex;
-    font-size: 1rem;
-    height: 20px;
-    justify-content: center;
-    padding: 2px;
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    width: 20px;
   }
 
   .load-more-trigger {
