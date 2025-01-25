@@ -92,6 +92,15 @@
     <div class="d-flex justify-content-center mt-5">
       <button class="btn btn-success text-light" @click="saveBallot">Save Ballot</button>
     </div>
+    <!-- Toast Notification -->
+    <div v-if="showToast" class="toast align-items-center p-1" :class="{show: showToast}" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          Ballot saved successfully!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="showToast = false" aria-label="Close"></button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -120,7 +129,9 @@ export default {
       currentPage: 1,
       totalPages: 1,
       observer: null,
-      showScrollIndicator: true
+      showScrollIndicator: true,
+      showToast: false,
+      pageLoadedTime: null
     };
   },
   computed: {
@@ -294,6 +305,13 @@ export default {
       try {
         await set(userBallotRef, ballotData);
         console.log("Ballot saved successfully");
+        const currentTime = new Date().getTime();
+        if (currentTime - this.pageLoadedTime >= 5000) {
+          this.showToast = true; // Show the toast notification
+          setTimeout(() => {
+            this.showToast = false; // Hide the toast notification after 3 seconds
+          }, 1000);
+        }
       } catch (error) {
         console.error("Error saving ballot:", error);
       }
@@ -304,6 +322,7 @@ export default {
     }
   },
   mounted () {
+    this.pageLoadedTime = new Date().getTime(); // Set the page loaded time
     this.fetchAwards();
   }
 };
@@ -438,6 +457,28 @@ export default {
 
   .load-more-trigger {
     height: 1px;
+  }
+
+  .toast {
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 5px;
+    color: white;
+    position: fixed;
+    right: 20px;
+    transition: opacity 0.5s;
+    width: 230px;
+    z-index: 2;
+
+    @media (max-width: 767px) {
+      background-color: rgba(0, 0, 0, 0.9);
+      right: 50%;
+      top: 20px;
+      transform: translateX(50%);
+    }
+
+    @media (min-width: 768px) {
+      bottom: 20px;
+    }
   }
 }
 </style>
