@@ -89,6 +89,9 @@
         </div>
       </div>
     </div>
+    <div class="save-button d-flex justify-content-end">
+      <button class="btn btn-primary" @click="saveBallot">Save Ballot</button>
+    </div>
     <!-- Toast Notification -->
     <div v-if="showToast" class="toast align-items-center p-1" :class="{show: showToast}" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
