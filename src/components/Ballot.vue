@@ -259,6 +259,10 @@ export default {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
       gap: 2px;
+
+      @media screen and (min-width: 832px) {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      }
     }
 
     .scroll-indicator {
@@ -307,11 +311,19 @@ export default {
   }
 
   .checkmark {
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    color: #49b429;
+    display: flex;
+    font-size: 1rem;
+    height: 20px;
+    justify-content: center;
+    padding: 2px;
     position: absolute;
-    top: 5px;
     right: 5px;
-    color: $success;
-    font-size: 1.5rem;
+    top: 5px;
+    width: 20px;
   }
 
   .load-more-trigger {
