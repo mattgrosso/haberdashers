@@ -189,27 +189,30 @@ export default {
         : [];
 
       // Fetch legacy movies for "The Haberdasher Legacy Award"
-      await this.fetchLegacyMovies();
+      await this.fetchLegacyMovies(true); // Fetch two pages initially
       this.loadSelectedLegacyMovies();
     },
-    async fetchLegacyMovies () {
+    async fetchLegacyMovies (initialLoad = false) {
       if (this.currentPage > this.totalPages) return;
 
       try {
         const legacyYear = this.yearToUse - 25;
-        const response = await axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${process.env.VUE_APP_TMDB_API_KEY}&primary_release_year=${legacyYear}&language=en-US&page=${this.currentPage}&sort_by=vote_count.desc`);
-        const newMovies = response.data.results;
-        this.legacyMovies = [...this.legacyMovies, ...newMovies];
-        this.totalPages = response.data.total_pages;
-        this.currentPage++;
+        const pagesToFetch = initialLoad ? 2 : 1; // Fetch two pages initially
+        for (let i = 0; i < pagesToFetch; i++) {
+          const response = await axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${process.env.VUE_APP_TMDB_API_KEY}&primary_release_year=${legacyYear}&language=en-US&page=${this.currentPage}&sort_by=vote_count.desc`);
+          const newMovies = response.data.results;
+          this.legacyMovies = [...this.legacyMovies, ...newMovies];
+          this.totalPages = response.data.total_pages;
+          this.currentPage++;
 
-        // Mark newly loaded movies as selected if they are in the selectedLegacyMovies list
-        this.selectedLegacyMovies.forEach(selectedMovie => {
-          const matchedMovie = newMovies.find(m => m.title === selectedMovie.title);
-          if (matchedMovie) {
-            this.selectedLegacyMovies.push(matchedMovie);
-          }
-        });
+          // Mark newly loaded movies as selected if they are in the selectedLegacyMovies list
+          this.selectedLegacyMovies.forEach(selectedMovie => {
+            const matchedMovie = newMovies.find(m => m.title === selectedMovie.title);
+            if (matchedMovie) {
+              this.selectedLegacyMovies.push(matchedMovie);
+            }
+          });
+        }
       } catch (error) {
         console.error("Error fetching legacy movies:", error);
       }
