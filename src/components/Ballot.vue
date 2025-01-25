@@ -43,7 +43,7 @@
           </div>
           <div class="legacy-posters" ref="legacyPosters" @scroll="handleScroll">
             <div class="legacy-award-grid" ref="legacyGrid">
-              <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" :class="{'selected': isSelected(movie)}" @click="toggleMovieSelection(movie)">
+              <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" :class="{'selected': isSelected(movie)}" @click="toggleMovieSelection(movie)" :title="movie.title">
                 <img :src="`https://image.tmdb.org/t/p/w200${movie.poster_path}`" :alt="movie.title">
                 <div v-if="isSelected(movie)" class="overlay">
                   <i class="bi bi-check-circle-fill checkmark"></i>
