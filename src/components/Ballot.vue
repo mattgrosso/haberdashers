@@ -20,8 +20,8 @@
           </draggable>
           <div class="legacy-posters" ref="legacyPosters" @scroll="handleScroll">
             <div class="legacy-award-grid" ref="legacyGrid">
-              <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" @click="toggleMovieSelection(movie)">
-                <img :src="`https://image.tmdb.org/t/p/w200${movie.poster_path}`" :alt="movie.title" :class="{'selected': isSelected(movie)}">
+              <div v-for="movie in legacyMovies" :key="movie.id" class="movie-poster" :class="{'selected': isSelected(movie)}" @click="toggleMovieSelection(movie)">
+                <img :src="`https://image.tmdb.org/t/p/w200${movie.poster_path}`" :alt="movie.title">
                 <div v-if="isSelected(movie)" class="checkmark">
                   <i class="bi bi-check-circle-fill"></i>
                 </div>
@@ -152,6 +152,7 @@ export default {
 
       // Fetch legacy movies for "The Haberdasher Legacy Award"
       await this.fetchLegacyMovies();
+      this.loadSelectedLegacyMovies();
     },
     async fetchLegacyMovies() {
       if (this.currentPage > this.totalPages) return;
@@ -159,11 +160,29 @@ export default {
       try {
         const legacyYear = this.yearToUse - 25;
         const response = await axios.get(`https://api.themoviedb.org/3/discover/movie?api_key=${process.env.VUE_APP_TMDB_API_KEY}&primary_release_year=${legacyYear}&language=en-US&page=${this.currentPage}&sort_by=vote_count.desc`);
-        this.legacyMovies = [...this.legacyMovies, ...response.data.results];
+        const newMovies = response.data.results;
+        this.legacyMovies = [...this.legacyMovies, ...newMovies];
         this.totalPages = response.data.total_pages;
         this.currentPage++;
+
+        // Mark newly loaded movies as selected if they are in the selectedLegacyMovies list
+        this.selectedLegacyMovies.forEach(selectedMovie => {
+          const matchedMovie = newMovies.find(m => m.title === selectedMovie.title);
+          if (matchedMovie) {
+            this.selectedLegacyMovies.push(matchedMovie);
+          }
+        });
       } catch (error) {
         console.error("Error fetching legacy movies:", error);
+      }
+    },
+    loadSelectedLegacyMovies() {
+      const legacyAward = this.awards.find(award => award.name === "The Haberdasher Legacy Award");
+      if (legacyAward) {
+        this.selectedLegacyMovies = legacyAward.seenMovies.map(movie => {
+          const matchedMovie = this.legacyMovies.find(m => m.title === movie.name);
+          return matchedMovie || { title: movie.name };
+        });
       }
     },
     toggleMovieSelection(movie) {
@@ -298,7 +317,7 @@ export default {
   .movie-poster {
     position: relative;
     cursor: pointer;
-    border: 2px solid transparent;
+    border: 4px solid transparent;
   }
 
   .movie-poster img {
@@ -307,12 +326,13 @@ export default {
   }
 
   .movie-poster.selected {
-    border-color: $primary;
+    border-color: #49b429;
+    padding: 6px;
   }
 
   .checkmark {
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgb(255, 255, 255);
     border-radius: 50%;
     color: #49b429;
     display: flex;
