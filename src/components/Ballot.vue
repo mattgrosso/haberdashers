@@ -76,7 +76,7 @@
             <i class="bi bi-arrow-up mx-2"/>
             <i class="bi bi-arrow-up mx-2"/>
             <i class="bi bi-arrow-up mx-2"/>
-            <p class="m-0">Drag nominees you have seen up here and rank them.</p>
+            <p class="m-0">Drag nominees you have seen and liked up here and rank them.</p>
           </div>
           <draggable v-model="award.nominees" class="list-group" :group="'movies'" handle=".drag-handle">
             <template #item="{ element }">
