@@ -5,13 +5,15 @@
         <h2 class="card-title text-center">Ballot Management</h2>
       </div>
       <div class="card-body d-flex justify-content-around flex-wrap">
-        <button class="btn btn-primary mb-3" @click="sendEmailToUsers">Send Email to Users</button>
-        <button class="btn btn-primary mb-3" @click="evaluateBallots">Evaluate Ballots</button>
+        <button class="btn btn-primary mb-3 col-12" @click="sendEmailToUsers">Send Email to Users</button>
+        <div class="d-flex align-items-center mb-3 col-12">
+          <button class="btn btn-secondary me-2 col-12" @click="evaluateBallots">Evaluate {{ voterCount }} Ballots</button>
+        </div>
         <div v-if="showWinners">
           <h3 class="mt-4">Winners</h3>
           <ul class="list-group">
             <li class="list-group-item" v-for="award in sortedAwards" :key="award[0]">
-              <strong>{{ award[1].name }}:</strong>
+              <strong>{{ award[1].name }} ({{ winners[award[0]].ballots }} ballots):</strong>
               <ul class="list-group mt-2">
                 <li class="list-group-item" v-for="nominee in sortedNominees(award)" :key="nominee[0]" :class="{'list-group-item-success': nominee[1].rank === 1}">
                   <span v-if="award[0] === 'The_Haberdasher_Legacy_Award'">{{ nominee[0] }} - {{ nominee[1].borda }} points</span>
@@ -37,7 +39,8 @@ export default {
     return {
       winners: {},
       awards: {},
-      showWinners: false
+      showWinners: false,
+      voterCount: 0 // Add voterCount to data
     };
   },
   computed: {
@@ -73,12 +76,20 @@ export default {
 
         const results = {};
         const categories = new Set();
+        let voterCount = 0; // Initialize voterCount
 
-        // Collect all categories
+        // Collect all categories and count voters
         for (const user of Object.values(users)) {
           if (!user.ballot) continue;
+          let hasRanked = false;
           for (const category of Object.keys(user.ballot)) {
             categories.add(category);
+            if (user.ballot[category].ranked && user.ballot[category].ranked.length > 0) {
+              hasRanked = true;
+            }
+          }
+          if (hasRanked) {
+            voterCount++;
           }
         }
 
@@ -177,8 +188,11 @@ export default {
             numProcessed++;
           }
 
-          // Store final ranking for this category
-          results[category] = categoryResult;
+          // Store final ranking and ballot count for this category
+          results[category] = {
+            nominees: categoryResult,
+            ballots: rankedBallots.length // Add ballot count
+          };
         }
 
         const legacy = {};
@@ -197,21 +211,52 @@ export default {
             })
           }
         }
-        results.The_Haberdasher_Legacy_Award = legacy;
+        results.The_Haberdasher_Legacy_Award = {
+          nominees: legacy,
+          ballots: Object.values(users).filter(user => user.ballot && user.ballot.The_Haberdasher_Legacy_Award && user.ballot.The_Haberdasher_Legacy_Award.ranked).length // Add ballot count
+        };
 
         const awardsRef = ref(db, "awards");
         const awardsSnap = await get(awardsRef);
         this.awards = awardsSnap.val();
 
-        console.log(results);
         this.winners = results;
+        this.voterCount = voterCount; // Update voterCount
         this.showWinners = true;
       } catch (error) {
         console.error("Error evaluating ballots:", error);
       }
     },
+    async fetchVoterCount () {
+      try {
+        const usersRef = ref(db, "users");
+        const snapshot = await get(usersRef);
+        const users = snapshot.val();
+
+        let voterCount = 0;
+
+        // Count voters
+        for (const user of Object.values(users)) {
+          if (!user.ballot) continue;
+          let hasRanked = false;
+          for (const category of Object.keys(user.ballot)) {
+            if (user.ballot[category].ranked && user.ballot[category].ranked.length > 0) {
+              hasRanked = true;
+              break;
+            }
+          }
+          if (hasRanked) {
+            voterCount++;
+          }
+        }
+
+        this.voterCount = voterCount; // Update voterCount
+      } catch (error) {
+        console.error("Error fetching voter count:", error);
+      }
+    },
     sortedNominees (award) {
-      return Object.entries(this.winners[award[0]]).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
+      return Object.entries(this.winners[award[0]].nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
     },
     toTitleCase (str) {
       return str
@@ -220,6 +265,9 @@ export default {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     }
+  },
+  async mounted () {
+    await this.fetchVoterCount(); // Fetch voter count on mount
   }
 };
 </script>
