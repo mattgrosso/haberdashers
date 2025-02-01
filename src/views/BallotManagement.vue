@@ -13,9 +13,9 @@
             <li class="list-group-item" v-for="award in sortedAwards" :key="award[0]">
               <strong>{{ award[1].name }}:</strong>
               <ul class="list-group mt-2">
-                <li class="list-group-item" v-for="nominee in sortedNominees(award)" :key="nominee[0]" :class="{'list-group-item-success': nominee[1] === 1}">
+                <li class="list-group-item" v-for="nominee in sortedNominees(award)" :key="nominee[0]" :class="{'list-group-item-success': nominee[1].rank === 1}">
                   <span v-if="award[0] === 'The_Haberdasher_Legacy_Award'">{{ nominee[0] }} - {{ nominee[1].borda }} points</span>
-                  <span v-else>{{ nominee[1] }}. {{ nominee[0] }}</span>
+                  <span v-else>{{ nominee[1].rank }}. {{ nominee[0] }} - {{ nominee[1].score }} points</span>
                 </li>
               </ul>
             </li>
@@ -160,7 +160,7 @@ export default {
           // 2. Sort nominees by descending beatsCount
           const sorted = [...nominees].sort((x, y) => beatsCount[y] - beatsCount[x]);
 
-          // 3. Assign ranks: ties get the same rank, skip subsequent ranks
+          // 3. Assign ranks and scores: ties get the same rank, skip subsequent ranks
           const categoryResult = {};
           let currentRank = 1;
           let numProcessed = 0;
@@ -172,7 +172,7 @@ export default {
             if (previousScore !== null && score < previousScore) {
               currentRank = numProcessed + 1;
             }
-            categoryResult[nominee] = currentRank;
+            categoryResult[nominee] = { rank: currentRank, score: score };
             previousScore = score;
             numProcessed++;
           }
@@ -211,7 +211,7 @@ export default {
       }
     },
     sortedNominees (award) {
-      return Object.entries(this.winners[award[0]]).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1] - b[1]);
+      return Object.entries(this.winners[award[0]]).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
     },
     toTitleCase (str) {
       return str
