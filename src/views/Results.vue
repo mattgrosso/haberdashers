@@ -1,24 +1,24 @@
 <template>
   <div class="results p-3 mb-5">
-    <h2 class="card-title text-center">{{ this.lastYear }} Results</h2>
-    <div v-for="award in sortedAwards" :key="award[0]" class="mb-4 p-3 card">
+    <div v-for="award in sortedAwards" :key="award[0]" class="mb-4 card">
       <div class="card-header bg-primary text-white">
-        <h3>{{ award[1].name }} ({{ winners[award[0]]?.ballots || 0 }} ballots)</h3>
+        <h3>{{ award[1].name }}</h3>
       </div>
       <div v-if="winners[award[0]]?.winner" class="card-body">
         <ul class="list-group">
-          <li v-for="(nominee, index) in tiedWinners(award)" :key="index" class="list-group-item list-group-item-success">
-            <strong>Winner: {{ nominee }}</strong> - {{ nomineeVotes(award, nominee) }} ballot wins
-            <span v-if="isVoteTied(award, nominee)"> (Borda: {{ nomineeBorda(award, nominee) }})</span>
+          <li class="list-group-item list-group-item-success winner-item" v-for="(nominee, index) in tiedWinners(award)" :key="index">
+            <span class="d-flex col-9"><strong>{{ nominee }}</strong></span>
+            <span class="vote-count d-flex col-3 justify-content-end align-items-center">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span> votes)</span>
           </li>
-          <li class="list-group-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="!tiedWinners(award).includes(nominee)">
-            {{ nominee }}
-            <span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} ballot wins</span>
-            <span v-if="isVoteTied(award, nominee)"> (Borda: {{ nomineeBorda(award, nominee) }})</span>
+          <li class="list-group-item nominee-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="!tiedWinners(award).includes(nominee)">
+            <span class="d-flex col-9">{{ nominee }}</span>
+            <span v-if="nomineeVotes(award, nominee)" class="d-flex col-3 justify-content-end"><span class="vote-count">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span> votes)</span></span>
           </li>
         </ul>
+        <div class="chart-container">
+          <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
+        </div>
       </div>
-      <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
     </div>
   </div>
 </template>
@@ -53,6 +53,7 @@ export default {
     chartOptions() {
       return {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
             position: 'top',
@@ -167,6 +168,33 @@ export default {
   .list-group-item-success {
     background-color: $success !important;
     color: white !important;
+  }
+
+  .winner-item {
+    display: flex;
+    font-size: 1.25rem;
+    font-weight: bold;
+    line-height: 1.3;
+
+    .vote-count {
+      font-size: 0.75rem;
+    }
+  }
+
+  .nominee-item {
+    display: flex;
+    font-size: 0.875rem;
+
+    .vote-count {
+      font-size: 0.65rem;
+    }
+  }
+
+
+  .chart-container {
+    position: relative;
+    height: 400px; /* Set a minimum height for the charts */
+    width: 100%;
   }
 }
 </style>
