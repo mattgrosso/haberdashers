@@ -8,11 +8,15 @@
         <div v-for="award in sortedAwards" :key="award[0]" class="mb-4">
           <h3>{{ award[1].name }} ({{ winners[award[0]]?.ballots || 0 }} ballots)</h3>
           <div v-if="winners[award[0]]?.winner">
-            <ol>
-              <li v-for="(nominee, index) in rankedNominees(award)" :key="index">
+            <h4>Winners:</h4>
+            <ul class="list-group">
+              <li class="list-group-item list-group-item-success">
+                <strong>Winner: {{ rankedNominees(award)[0] }}</strong> - {{ nomineeVotes(award, rankedNominees(award)[0]) }} votes
+              </li>
+              <li class="list-group-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="index > 0">
                 {{ nominee }}<span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} votes</span>
               </li>
-            </ol>
+            </ul>
           </div>
           <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
         </div>
