@@ -4,7 +4,7 @@
       <div class="card-header bg-primary text-white">
         <h3>{{ award[1].name }}</h3>
       </div>
-      <div v-if="winners[award[0]]?.winner" class="card-body">
+      <div v-if="award[0] !== 'The_Haberdasher_Legacy_Award' && winners[award[0]]?.winner" class="card-body">
         <ul class="list-group">
           <li class="list-group-item list-group-item-success winner-item" v-for="(nominee, index) in tiedWinners(award)" :key="index">
             <span class="d-flex col-9"><strong>{{ nominee }}</strong></span>
@@ -16,10 +16,28 @@
           </li>
         </ul>
         <hr class="mt-4 col-9 mx-auto"/>
-        <div v-if="winners[award[0]]?.rounds && winners[award[0]]?.rounds.length > 1" class="chart-container">
+        <div v-if="winners[award[0]]?.rounds && winners[award[0]]?.rounds.length > 1" class="chart-container mb-3">
+          <div class="d-flex justify-content-center align-items-center mb-2">
+            <h4 class="m-0 chart-title">Instant Runoff Voting Rounds</h4>
+            <a href="https://electionlab.mit.edu/sites/default/files/styles/single_image_2x/public/IRV-flowchart.png?itok=sRp9ToSm" target="_blank" class="info-icon ms-2">
+              <i class="bi bi-info-circle"></i>
+            </a>
+          </div>
           <line-chart :data="getChartData(award[0])" :options="chartOptions"></line-chart>
         </div>
         <p v-else class="text-center">The first ballot had a clear winner, so no additional rounds were needed.</p>
+      </div>
+      <div v-else-if="award[0] === 'The_Haberdasher_Legacy_Award'" class="card-body">
+        <ul class="list-group">
+          <li v-for="(movie, index) in legacyAwardArray" :key="index" class="list-group-item d-flex align-items-center">
+            <img :src="movie.poster" alt="Poster" class="movie-poster me-3"/>
+            <div>
+              <h5>{{ movie.nominee }}</h5>
+              <p class="m-0">Borda Score: {{ movie.votes.borda }}</p>
+              <p class="m-0">Ballots: {{ movie.votes.ballots }}</p>
+            </div>
+          </li>
+        </ul>
       </div>
     </div>
   </div>
@@ -29,6 +47,7 @@
 import { getDatabase, ref, get } from "firebase/database";
 import { Line } from 'vue-chartjs';
 import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';
+import axios from 'axios';
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
 
@@ -42,7 +61,8 @@ export default {
   data () {
     return {
       awards: {},
-      winners: {}
+      winners: {},
+      legacyMovies: {} // Store movie details
     };
   },
   computed: {
@@ -51,6 +71,23 @@ export default {
     },
     lastYear () {
       return new Date().getFullYear() - 1;
+    },
+    legacyAwardArray () {
+      if (!this.winners.The_Haberdasher_Legacy_Award) return [];
+      const nominees = Object.entries(this.winners.The_Haberdasher_Legacy_Award.nominees).map(([nominee, votes]) => {
+        const posterPath = this.legacyMovies[this.replaceUnderscoresWithPeriods(nominee)]?.poster_path
+        return {
+          nominee: this.replaceUnderscoresWithPeriods(nominee),
+          votes,
+          poster: posterPath ? `https://image.tmdb.org/t/p/w200${posterPath}` : ''
+        };
+      });
+      return nominees.sort((a, b) => {
+        if (b.votes.borda === a.votes.borda) {
+          return b.votes.ballots - a.votes.ballots;
+        }
+        return b.votes.borda - a.votes.borda;
+      });
     },
     chartOptions() {
       return {
@@ -67,16 +104,6 @@ export default {
               boxWidth: 10, // Reduce the box width
               padding: 10 // Reduce the padding
             }
-          },
-          title: {
-            display: true,
-            text: 'Instant Runoff Voting Rounds',
-            font: {
-              size: 10,
-              family: 'Arial, sans-serif',
-              weight: 'bold'
-            },
-            color: '#333'
           },
           tooltip: {
             backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -138,8 +165,41 @@ export default {
           results[awardKey] = resultsSnap.val() || {};
         }
         this.winners = results;
+
+        // Fetch movie details for legacy award nominees
+        if (this.winners.The_Haberdasher_Legacy_Award) {
+          await this.fetchLegacyMovies();
+        }
       } catch (error) {
         console.error("Error fetching results:", error);
+      }
+    },
+    replaceUnderscoresWithPeriods (string) {
+      return string.replace(/_/g, '.');
+    },
+    async fetchLegacyMovies () {
+      const nominees = Object.keys(this.winners.The_Haberdasher_Legacy_Award.nominees);
+      const moviePromises = nominees.map(nominee => this.fetchMovieDetails(this.replaceUnderscoresWithPeriods(nominee)));
+      const movies = await Promise.all(moviePromises);
+      movies.forEach(movie => {
+        if (movie) {
+          this.legacyMovies = { ...this.legacyMovies, [movie.title]: movie };
+        }
+      });
+    },
+    async fetchMovieDetails (title) {
+      try {
+        const response = await axios.get(`https://api.themoviedb.org/3/search/movie`, {
+          params: {
+            api_key: process.env.VUE_APP_TMDB_API_KEY,
+            query: title
+          }
+        });
+
+        return response.data.results[0];
+      } catch (error) {
+        console.error(`Error fetching details for movie: ${title}`, error);
+        return null;
       }
     },
     rankedNominees (award) {
@@ -258,6 +318,27 @@ export default {
     position: relative;
     height: 400px; /* Set a minimum height for the charts */
     width: 100%;
+  }
+
+  .chart-title {
+    font-size: 10px; /* Set the font size to 10 */
+    text-align: center; /* Center the text */
+  }
+
+  .info-icon {
+    font-size: 0.75rem; /* Make the icon smaller to match the font size */
+    color: black; /* Change the color to black */
+    text-decoration: none;
+
+    &:hover {
+      color: darken(black, 10%);
+    }
+  }
+
+  .movie-poster {
+    width: 50px;
+    height: 75px;
+    object-fit: cover;
   }
 }
 </style>

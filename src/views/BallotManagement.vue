@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { getDatabase, ref, get, set } from "firebase/database";
+import { getDatabase, ref, get } from "firebase/database";
 
 const db = getDatabase();
 
@@ -45,7 +45,6 @@ export default {
   },
   computed: {
     sortedAwards () {
-      if (!this.awards) return [];
       return Object.entries(this.awards).sort((a, b) => a[1].rank - b[1].rank);
     }
   },
@@ -69,118 +68,11 @@ export default {
         console.error("Error sending email to users:", error);
       }
     },
-    sanitizeKey (key) {
-      return key.replace(/[.#$/[\]]/g, '_');
-    },
-    async runoffBallots(rankedBallots, nominees) {
-      let rounds = [];
-      let eliminated = new Set();
-      let eliminationOrder = [];
-
-      while (true) {
-        // Identify remaining candidates.
-        const remainingCandidates = nominees.filter(nom => !eliminated.has(nom));
-        
-        // Count first-choice votes.
-        let voteCounts = {};
-        remainingCandidates.forEach(nom => { voteCounts[nom] = 0; });
-        for (const ballot of rankedBallots) {
-          const choice = ballot.find(nom => !eliminated.has(nom));
-          if (choice) voteCounts[choice]++;
-        }
-        
-        // Compute Borda counts for the remaining candidates in this round.
-        let bordaCounts = {};
-        remainingCandidates.forEach(nom => { bordaCounts[nom] = 0; });
-        for (const ballot of rankedBallots) {
-          for (const candidate of remainingCandidates) {
-            const idx = ballot.indexOf(candidate);
-            if (idx !== -1) {
-              bordaCounts[candidate] += (ballot.length - idx);
-            }
-          }
-        }
-        
-        // Record this round's results.
-        rounds.push({ votes: { ...voteCounts }, borda: { ...bordaCounts } });
-        
-        // Recalculate the active ballots (ballots with any remaining candidate)
-        const activeBallots = rankedBallots.filter(ballot =>
-          ballot.some(candidate => !eliminated.has(candidate))
-        );
-        const totalVotes = activeBallots.length;
-        const majority = totalVotes / 2;
-        
-        // Check for a majority winner.
-        for (const [candidate, count] of Object.entries(voteCounts)) {
-          if (count > majority) {
-            eliminationOrder.push(...remainingCandidates.filter(c => c !== candidate));
-            eliminationOrder.push(candidate);
-            return { winner: candidate, rounds, rankedNominees: eliminationOrder.reverse() };
-          }
-        }
-        
-        // Special handling for two candidates left:
-        if (remainingCandidates.length === 2) {
-          const [cand1, cand2] = remainingCandidates;
-          if (voteCounts[cand1] === voteCounts[cand2]) {
-            // Use Borda counts to break the tie.
-            if (bordaCounts[cand1] > bordaCounts[cand2]) {
-              eliminationOrder.push(cand2, cand1);
-              return { winner: cand1, rounds, rankedNominees: eliminationOrder.reverse() };
-            } else if (bordaCounts[cand2] > bordaCounts[cand1]) {
-              eliminationOrder.push(cand1, cand2);
-              return { winner: cand2, rounds, rankedNominees: eliminationOrder.reverse() };
-            } else {
-              eliminationOrder.push(cand1, cand2);
-              return { winner: "tie", rounds, rankedNominees: eliminationOrder.reverse() };
-            }
-          }
-        }
-        
-        // Identify the candidate(s) with the fewest votes.
-        const minVotes = Math.min(...Object.values(voteCounts));
-        let candidatesForElimination = Object.entries(voteCounts)
-          .filter(([_, count]) => count === minVotes)
-          .map(([nom]) => nom);
-        
-        // Use Borda tiebreaker if needed.
-        if (candidatesForElimination.length > 1) {
-          const bordaTie = {};
-          candidatesForElimination.forEach(candidate => {
-            bordaTie[candidate] = bordaCounts[candidate];
-          });
-          const minBorda = Math.min(...Object.values(bordaTie));
-          const tiedByBorda = candidatesForElimination.filter(candidate => bordaTie[candidate] === minBorda);
-          if (tiedByBorda.length === 1) {
-            eliminated.add(tiedByBorda[0]);
-            eliminationOrder.push(tiedByBorda[0]);
-          } else {
-            tiedByBorda.forEach(candidate => {
-              eliminated.add(candidate);
-              eliminationOrder.push(candidate);
-            });
-          }
-        } else {
-          eliminated.add(candidatesForElimination[0]);
-          eliminationOrder.push(candidatesForElimination[0]);
-        }
-        
-        // If no candidates remain, it's a tie.
-        if (nominees.filter(nom => !eliminated.has(nom)).length === 0) {
-          return { winner: "tie", rounds, rankedNominees: eliminationOrder.reverse() };
-        }
-      }
-    },
     async evaluateBallots () {
       try {
         const usersRef = ref(db, "users");
         const snapshot = await get(usersRef);
         const users = snapshot.val();
-
-        if (!users) {
-          return;
-        }
 
         const results = {};
         const categories = new Set();
@@ -218,15 +110,88 @@ export default {
           const nominees = [...nomineeSet];
           if (nominees.length === 0) continue;
 
-          // Run the instant runoff voting process
-          const { winner, rounds, rankedNominees } = await this.runoffBallots(rankedBallots, nominees);
+          // Step A: pairwise preferences d(A,B)
+          const d = {};
+          nominees.forEach(a => {
+            d[a] = {};
+            nominees.forEach(b => {
+              if (a !== b) d[a][b] = 0;
+            });
+          });
+
+          for (const ballot of rankedBallots) {
+            for (let i = 0; i < ballot.length; i++) {
+              for (let j = i + 1; j < ballot.length; j++) {
+                d[ballot[i]][ballot[j]] += 1;
+              }
+            }
+          }
+
+          // Step B: compute strongest paths D(A,B)
+          const D = {};
+          nominees.forEach(a => {
+            D[a] = {};
+            nominees.forEach(b => {
+              D[a][b] = 0;
+            });
+          });
+
+          // If d(A,B) > d(B,A), set D(A,B) = d(A,B)
+          nominees.forEach(a => {
+            nominees.forEach(b => {
+              if (a !== b && d[a][b] > d[b][a]) {
+                D[a][b] = d[a][b];
+              }
+            });
+          });
+
+          // Floyd–Warshall-like update
+          nominees.forEach(i => {
+            nominees.forEach(j => {
+              if (i === j) return;
+              nominees.forEach(k => {
+                if (i === k || j === k) return;
+                D[j][k] = Math.max(D[j][k], Math.min(D[j][i], D[i][k]));
+              });
+            });
+          });
+
+          // Step C: build a ranking rather than just picking winners
+          // 1. For each nominee, count how many others it "beats"
+          //    (i.e., D(a,b) > D(b,a)).
+          const beatsCount = {};
+          nominees.forEach(a => {
+            let count = 0;
+            for (const b of nominees) {
+              if (b !== a && D[a][b] > D[b][a]) count++;
+            }
+            beatsCount[a] = count;
+          });
+
+          // 2. Sort nominees by descending beatsCount
+          const sorted = [...nominees].sort((x, y) => beatsCount[y] - beatsCount[x]);
+
+          // 3. Assign ranks and scores: ties get the same rank, skip subsequent ranks
+          const categoryResult = {};
+          let currentRank = 1;
+          let numProcessed = 0;
+          let previousScore = null;
+
+          for (let i = 0; i < sorted.length; i++) {
+            const nominee = sorted[i];
+            const score = beatsCount[nominee];
+            if (previousScore !== null && score < previousScore) {
+              currentRank = numProcessed + 1;
+            }
+            categoryResult[nominee] = { rank: currentRank, score: score };
+            previousScore = score;
+            numProcessed++;
+          }
 
           // Store final ranking and ballot count for this category
           results[category] = {
-            winner,
-            rounds,
-            ballots: rankedBallots.length, // Add ballot count
-            rankedNominees // Add ranked nominees
+            nominees: categoryResult,
+            ballots: rankedBallots.length // Add ballot count
           };
         }
 
@@ -234,12 +199,11 @@ export default {
         for (const user of Object.values(users)) {
           if (user.ballot && user.ballot.The_Haberdasher_Legacy_Award && user.ballot.The_Haberdasher_Legacy_Award.ranked) {
             user.ballot.The_Haberdasher_Legacy_Award.ranked.forEach((m, index) => {
-              const sanitizedNominee = this.sanitizeKey(m);
-              if (legacy[sanitizedNominee]) {
-                legacy[sanitizedNominee].ballots++;
-                legacy[sanitizedNominee].borda += Math.max(0, 10 - index);
+              if (legacy[m]) {
+                legacy[m].ballots++;
+                legacy[m].borda += Math.max(0, 10 - index);
               } else {
-                legacy[sanitizedNominee] = {
+                legacy[m] = {
                   ballots: 1,
                   borda: Math.max(0, 10 - index)
                 }
@@ -254,18 +218,11 @@ export default {
 
         const awardsRef = ref(db, "awards");
         const awardsSnap = await get(awardsRef);
-        this.awards = awardsSnap.val() || {};
+        this.awards = awardsSnap.val();
 
         this.winners = results;
         this.voterCount = voterCount; // Update voterCount
         this.showWinners = true;
-
-        // Save results to the database
-        const currentYear = new Date().getFullYear();
-        for (const [category, result] of Object.entries(results)) {
-          const categoryRef = ref(db, `awards/${category}/years/${currentYear - 1}/results`);
-          await set(categoryRef, result);
-        }
       } catch (error) {
         console.error("Error evaluating ballots:", error);
       }
@@ -275,11 +232,6 @@ export default {
         const usersRef = ref(db, "users");
         const snapshot = await get(usersRef);
         const users = snapshot.val();
-
-        if (!users) {
-          console.error("No users found.");
-          return;
-        }
 
         let voterCount = 0;
 
@@ -304,9 +256,7 @@ export default {
       }
     },
     sortedNominees (award) {
-      const nominees = this.winners[award[0]]?.nominees;
-      if (!nominees) return [];
-      return Object.entries(nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
+      return Object.entries(this.winners[award[0]].nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
     },
     toTitleCase (str) {
       return str
