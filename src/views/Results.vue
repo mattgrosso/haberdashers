@@ -16,9 +16,10 @@
           </li>
         </ul>
         <hr class="mt-4 col-9 mx-auto"/>
-        <div class="chart-container">
-          <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
+        <div v-if="winners[award[0]]?.rounds && winners[award[0]]?.rounds.length > 1" class="chart-container">
+          <line-chart :data="getChartData(award[0])" :options="chartOptions"></line-chart>
         </div>
+        <p v-else class="text-center">The first ballot had a clear winner, so no additional rounds were needed.</p>
       </div>
     </div>
   </div>
@@ -178,7 +179,7 @@ export default {
         const maxBorda = Math.max(...Object.values(lastRoundBorda));
         return tiedNominees.filter(nominee => lastRoundBorda[nominee] === maxBorda);
       }
-      console.log('tiedNominees: ', tiedNominees);
+
       return tiedNominees;
     },
     getChartData (awardKey) {
