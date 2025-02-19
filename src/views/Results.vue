@@ -16,16 +16,25 @@
           </li>
         </ul>
         <hr class="mt-4 col-9 mx-auto"/>
-        <div v-if="winners[award[0]]?.rounds && winners[award[0]]?.rounds.length > 1" class="chart-container mb-3">
-          <div class="d-flex justify-content-center align-items-center mb-2">
-            <h4 class="m-0 chart-title">Instant Runoff Voting Rounds</h4>
-            <a href="https://electionlab.mit.edu/sites/default/files/styles/single_image_2x/public/IRV-flowchart.png?itok=sRp9ToSm" target="_blank" class="info-icon ms-2">
-              <i class="bi bi-info-circle"></i>
-            </a>
-          </div>
-          <line-chart :data="getChartData(award[0])" :options="chartOptions"></line-chart>
+        <div class="d-flex justify-content-end">
+          <button class="btn btn-sm btn-warning mb-3" @click="toggleChart(award[0])">
+            <span v-if="awards[award[0]].showChart">Hide</span>
+            <span v-else>Show</span>
+            Instant Runoff Graph
+          </button>
         </div>
-        <p v-else class="text-center">The first ballot had a clear winner, so no additional rounds were needed.</p>
+        <div v-if="awards[award[0]].showChart" class="chart-wrapper">
+          <div v-if="winners[award[0]].rounds.length > 1" class="chart-container mb-3">
+            <div class="d-flex justify-content-center align-items-center mb-2">
+              <h4 class="m-0 chart-title">Instant Runoff Voting Rounds</h4>
+              <a href="https://electionlab.mit.edu/sites/default/files/styles/single_image_2x/public/IRV-flowchart.png?itok=sRp9ToSm" target="_blank" class="info-icon ms-2">
+                <i class="bi bi-info-circle"></i>
+              </a>
+            </div>
+            <line-chart :data="getChartData(award[0])" :options="chartOptions"></line-chart>
+          </div>
+          <p v-else class="text-center">The first ballot had a clear winner, so no additional rounds were needed.</p>
+        </div>
       </div>
       <div v-else-if="award[0] === 'The_Haberdasher_Legacy_Award'" class="card-body">
         <ul class="list-group">
@@ -166,6 +175,11 @@ export default {
         }
         this.winners = results;
 
+        // Initialize showChart property for each award
+        Object.keys(this.awards).forEach(key => {
+          this.awards[key].showChart = false;
+        });
+
         // Fetch movie details for legacy award nominees
         if (this.winners.The_Haberdasher_Legacy_Award) {
           await this.fetchLegacyMovies();
@@ -201,6 +215,9 @@ export default {
         console.error(`Error fetching details for movie: ${title}`, error);
         return null;
       }
+    },
+    toggleChart (awardKey) {
+      this.awards[awardKey].showChart = !this.awards[awardKey].showChart;
     },
     rankedNominees (award) {
       return this.winners[award[0]].rankedNominees;
