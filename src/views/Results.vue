@@ -15,6 +15,7 @@
             <span v-if="nomineeVotes(award, nominee)" class="d-flex col-3 justify-content-end"><span class="vote-count">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span> votes)</span></span>
           </li>
         </ul>
+        <hr class="mt-4 col-9 mx-auto"/>
         <div class="chart-container">
           <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
         </div>
@@ -56,11 +57,67 @@ export default {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'top',
+            position: 'bottom', // Move the legend to the bottom
+            labels: {
+              font: {
+                size: 10, // Reduce the font size
+                family: 'Arial, sans-serif'
+              },
+              boxWidth: 10, // Reduce the box width
+              padding: 10 // Reduce the padding
+            }
           },
           title: {
             display: true,
-            text: 'Instant Runoff Voting Rounds'
+            text: 'Instant Runoff Voting Rounds',
+            font: {
+              size: 10,
+              family: 'Arial, sans-serif',
+              weight: 'bold'
+            },
+            color: '#333'
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            titleFont: {
+              size: 14,
+              family: 'Arial, sans-serif',
+              weight: 'bold'
+            },
+            bodyFont: {
+              size: 12,
+              family: 'Arial, sans-serif'
+            },
+            footerFont: {
+              size: 10,
+              family: 'Arial, sans-serif'
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              font: {
+                size: 12,
+                family: 'Arial, sans-serif'
+              },
+              color: '#333'
+            }
+          },
+          y: {
+            grid: {
+              color: 'rgba(0, 0, 0, 0.1)'
+            },
+            ticks: {
+              font: {
+                size: 12,
+                family: 'Arial, sans-serif'
+              },
+              color: '#333'
+            }
           }
         }
       };
@@ -189,7 +246,6 @@ export default {
       font-size: 0.65rem;
     }
   }
-
 
   .chart-container {
     position: relative;
