@@ -12,9 +12,12 @@
             <ul class="list-group">
               <li class="list-group-item list-group-item-success">
                 <strong>Winner: {{ rankedNominees(award)[0] }}</strong> - {{ nomineeVotes(award, rankedNominees(award)[0]) }} votes
+                <span v-if="isTied(award, rankedNominees(award)[0])"> (Borda: {{ nomineeBorda(award, rankedNominees(award)[0]) }})</span>
               </li>
               <li class="list-group-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="index > 0">
-                {{ nominee }}<span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} votes</span>
+                {{ nominee }}
+                <span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} votes</span>
+                <span v-if="isTied(award, nominee)"> (Borda: {{ nomineeBorda(award, nominee) }})</span>
               </li>
             </ul>
           </div>
@@ -91,6 +94,17 @@ export default {
     nomineeVotes (award, nominee) {
       const rounds = this.winners[award[0]].rounds;
       return rounds[rounds.length - 1].votes[nominee];
+    },
+    nomineeBorda (award, nominee) {
+      const rounds = this.winners[award[0]].rounds;
+      return rounds[rounds.length - 1].borda[nominee];
+    },
+    isTied (award, nominee) {
+      const rounds = this.winners[award[0]].rounds;
+      const lastRoundVotes = rounds[rounds.length - 1].votes;
+      const nomineeVotes = lastRoundVotes[nominee];
+      const tiedNominees = Object.keys(lastRoundVotes).filter(n => lastRoundVotes[n] === nomineeVotes);
+      return tiedNominees.length > 1;
     },
     getChartData (awardKey) {
       const awardResults = this.winners[awardKey];
