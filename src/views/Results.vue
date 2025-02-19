@@ -8,12 +8,12 @@
       <div v-if="winners[award[0]]?.winner" class="card-body">
         <ul class="list-group">
           <li v-for="(nominee, index) in tiedWinners(award)" :key="index" class="list-group-item list-group-item-success">
-            <strong>Winner: {{ nominee }}</strong> - {{ nomineeVotes(award, nominee) }} votes
+            <strong>Winner: {{ nominee }}</strong> - {{ nomineeVotes(award, nominee) }} ballot wins
             <span v-if="isVoteTied(award, nominee)"> (Borda: {{ nomineeBorda(award, nominee) }})</span>
           </li>
           <li class="list-group-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="!tiedWinners(award).includes(nominee)">
             {{ nominee }}
-            <span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} votes</span>
+            <span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} ballot wins</span>
             <span v-if="isVoteTied(award, nominee)"> (Borda: {{ nomineeBorda(award, nominee) }})</span>
           </li>
         </ul>
@@ -127,7 +127,8 @@ export default {
           label: nominee,
           data: awardResults.rounds.map(round => round.votes[nominee] || 0),
           borderColor: this.getRandomColor(),
-          fill: false
+          fill: false,
+          tension: 0.4
         };
       });
 
