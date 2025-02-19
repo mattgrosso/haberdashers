@@ -3,6 +3,7 @@ import Home from "../views/Home.vue";
 import AwardsConfig from "../views/AwardsConfig.vue";
 import BallotManagement from "../views/BallotManagement.vue";
 import Login from "../views/Login.vue";
+import Results from "../views/Results.vue"; // Import the new Results component
 import { auth } from "../assets/javascript/firebase";
 import { getDatabase, ref, get } from "firebase/database";
 
@@ -39,6 +40,14 @@ const routes = [
       requiresAdmin: true
     }
   },
+  {
+    path: "/results",
+    component: Results, // Add the new Results route
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true
+    }
+  }
 ];
 
 const router = createRouter({

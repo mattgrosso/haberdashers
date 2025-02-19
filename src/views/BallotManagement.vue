@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { getDatabase, ref, get } from "firebase/database";
+import { getDatabase, ref, get, set } from "firebase/database";
 
 const db = getDatabase();
 
@@ -67,6 +67,9 @@ export default {
       } catch (error) {
         console.error("Error sending email to users:", error);
       }
+    },
+    sanitizeKey (key) {
+      return key.replace(/[.#$/[\]]/g, '_');
     },
     async evaluateBallots () {
       try {
@@ -179,11 +182,12 @@ export default {
 
           for (let i = 0; i < sorted.length; i++) {
             const nominee = sorted[i];
+            const sanitizedNominee = this.sanitizeKey(nominee);
             const score = beatsCount[nominee];
             if (previousScore !== null && score < previousScore) {
               currentRank = numProcessed + 1;
             }
-            categoryResult[nominee] = { rank: currentRank, score: score };
+            categoryResult[sanitizedNominee] = { rank: currentRank, score: score };
             previousScore = score;
             numProcessed++;
           }
@@ -199,11 +203,12 @@ export default {
         for (const user of Object.values(users)) {
           if (user.ballot && user.ballot.The_Haberdasher_Legacy_Award && user.ballot.The_Haberdasher_Legacy_Award.ranked) {
             user.ballot.The_Haberdasher_Legacy_Award.ranked.forEach((m, index) => {
-              if (legacy[m]) {
-                legacy[m].ballots++;
-                legacy[m].borda += Math.max(0, 10 - index);
+              const sanitizedNominee = this.sanitizeKey(m);
+              if (legacy[sanitizedNominee]) {
+                legacy[sanitizedNominee].ballots++;
+                legacy[sanitizedNominee].borda += Math.max(0, 10 - index);
               } else {
-                legacy[m] = {
+                legacy[sanitizedNominee] = {
                   ballots: 1,
                   borda: Math.max(0, 10 - index)
                 }
@@ -223,6 +228,13 @@ export default {
         this.winners = results;
         this.voterCount = voterCount; // Update voterCount
         this.showWinners = true;
+
+        // Save results to the database
+        const currentYear = new Date().getFullYear();
+        for (const [category, result] of Object.entries(results)) {
+          const categoryRef = ref(db, `awards/${category}/years/${currentYear - 1}/results`);
+          await set(categoryRef, result);
+        }
       } catch (error) {
         console.error("Error evaluating ballots:", error);
       }

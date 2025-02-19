@@ -2,12 +2,10 @@
   <div class="home">
     <div class="px-3">
       <h2 v-if="userName" class="text-center my-3">Welcome, {{ userName }}!</h2>
-      <p>Here is your 2024 ballot.</p>
-      <p>Please rank the nominees in each category from your favorite at the top to your least favorite at the bottom.</p>
-      <p>It's ok if you haven't seen all of (or many of) the nominees. Just rank the ones you have seen and liked.</p>
-      <p>You'll be able to make changes to your ballot up until midnight on February 14th at which time the ballots will be locked and the results tabulated.</p>
+      <p>Voting on the 2024 ballot is now closed.</p>
+      <p>The winners will be announced soon.</p>
     </div>
-    <Ballot />
+    <!-- <Ballot /> -->
   </div>
 </template>
 
