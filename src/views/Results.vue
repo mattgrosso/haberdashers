@@ -8,11 +8,11 @@
         <ul class="list-group">
           <li class="list-group-item list-group-item-success winner-item" v-for="(nominee, index) in tiedWinners(award)" :key="index">
             <span class="d-flex col-9"><strong>{{ nominee }}</strong></span>
-            <span class="vote-count d-flex col-3 justify-content-end align-items-center">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span> votes)</span>
+            <span class="vote-count d-flex col-3 justify-content-end align-items-center">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span>&nbsp;votes)</span>
           </li>
           <li class="list-group-item nominee-item" v-for="(nominee, index) in rankedNominees(award)" :key="index" v-show="!tiedWinners(award).includes(nominee)">
             <span class="d-flex col-9">{{ nominee }}</span>
-            <span v-if="nomineeVotes(award, nominee)" class="d-flex col-3 justify-content-end"><span class="vote-count">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span> votes)</span></span>
+            <span v-if="nomineeVotes(award, nominee)" class="d-flex col-3 justify-content-end"><span class="vote-count">({{ nomineeVotes(award, nominee) }}<span v-if="isVoteTied(award, nominee)"><span class="vote-count">.{{ nomineeBorda(award, nominee) }}</span></span>&nbsp;votes)</span></span>
           </li>
         </ul>
         <hr class="mt-4 col-9 mx-auto"/>
@@ -170,10 +170,16 @@ export default {
     tiedWinners (award) {
       const rounds = this.winners[award[0]].rounds;
       const lastRoundVotes = rounds[rounds.length - 1].votes;
-      const lastRoundBorda = rounds[rounds.length - 1].borda;
       const maxVotes = Math.max(...Object.values(lastRoundVotes));
-      const maxBorda = Math.max(...Object.values(lastRoundBorda));
-      return Object.keys(lastRoundVotes).filter(nominee => lastRoundVotes[nominee] === maxVotes && lastRoundBorda[nominee] === maxBorda);
+      const tiedNominees = Object.keys(lastRoundVotes).filter(nominee => lastRoundVotes[nominee] === maxVotes);
+
+      if (tiedNominees.length > 1) {
+        const lastRoundBorda = rounds[rounds.length - 1].borda;
+        const maxBorda = Math.max(...Object.values(lastRoundBorda));
+        return tiedNominees.filter(nominee => lastRoundBorda[nominee] === maxBorda);
+      }
+      console.log('tiedNominees: ', tiedNominees);
+      return tiedNominees;
     },
     getChartData (awardKey) {
       const awardResults = this.winners[awardKey];
