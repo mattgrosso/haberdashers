@@ -2,17 +2,19 @@
   <div class="results p-3 mb-5">
     <div class="card">
       <div class="card-header bg-primary text-white">
-        <h2 class="card-title text-center">{{this.lastYear}} Results</h2>
+        <h2 class="card-title text-center">{{ this.lastYear }} Results</h2>
       </div>
       <div class="card-body">
         <div v-for="award in sortedAwards" :key="award[0]" class="mb-4">
           <h3>{{ award[1].name }} ({{ winners[award[0]]?.ballots || 0 }} ballots)</h3>
-          <ul class="list-group">
-            <li class="list-group-item" v-for="nominee in sortedNominees(award)" :key="nominee[0]" :class="{'list-group-item-success': nominee[1].rank === 1}">
-              <span v-if="award[0] === 'The_Haberdasher_Legacy_Award'">{{ nominee[0] }} - {{ nominee[1].borda }} points</span>
-              <span v-else>{{ nominee[1].rank }}. {{ nominee[0] }}</span>
-            </li>
-          </ul>
+          <div v-if="winners[award[0]]?.winner">
+            <ol>
+              <li v-for="(nominee, index) in rankedNominees(award)" :key="index">
+                {{ nominee }}<span v-if="nomineeVotes(award, nominee)"> - {{ nomineeVotes(award, nominee) }} votes</span>
+              </li>
+            </ol>
+          </div>
+          <line-chart v-if="winners[award[0]]?.rounds" :data="getChartData(award[0])" :options="chartOptions"></line-chart>
         </div>
       </div>
     </div>
@@ -21,11 +23,18 @@
 
 <script>
 import { getDatabase, ref, get } from "firebase/database";
+import { Line } from 'vue-chartjs';
+import { Chart as ChartJS, Title, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js';
+
+ChartJS.register(Title, Tooltip, Legend, LineElement, PointElement, LinearScale, CategoryScale);
 
 const db = getDatabase();
 
 export default {
   name: "Results",
+  components: {
+    LineChart: Line
+  },
   data () {
     return {
       awards: {},
@@ -34,10 +43,24 @@ export default {
   },
   computed: {
     sortedAwards () {
-      return Object.entries(this.awards).sort((a, b) => a[1].rank - b[1].rank);
+      return Object.entries(this.awards || {}).sort((a, b) => a[1].rank - b[1].rank);
     },
     lastYear () {
       return new Date().getFullYear() - 1;
+    },
+    chartOptions() {
+      return {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          title: {
+            display: true,
+            text: 'Instant Runoff Voting Rounds'
+          }
+        }
+      };
     }
   },
   methods: {
@@ -45,24 +68,52 @@ export default {
       try {
         const awardsRef = ref(db, "awards");
         const awardsSnap = await get(awardsRef);
-        this.awards = awardsSnap.val();
+        this.awards = awardsSnap.val() || {};
 
         const results = {};
         for (const awardKey of Object.keys(this.awards)) {
           const resultsRef = ref(db, `awards/${awardKey}/years/${this.lastYear}/results`);
           const resultsSnap = await get(resultsRef);
-          results[awardKey] = resultsSnap.val();
+          results[awardKey] = resultsSnap.val() || {};
         }
         this.winners = results;
-        console.log("Fetched results:", this.winners);
       } catch (error) {
         console.error("Error fetching results:", error);
       }
     },
-    sortedNominees (award) {
-      const nominees = this.winners[award[0]]?.nominees;
-      if (!nominees) return [];
-      return Object.entries(nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
+    rankedNominees (award) {
+      return this.winners[award[0]].rankedNominees;
+    },
+    nomineeVotes (award, nominee) {
+      const rounds = this.winners[award[0]].rounds;
+      return rounds[rounds.length - 1].votes[nominee];
+    },
+    getChartData (awardKey) {
+      const awardResults = this.winners[awardKey];
+      if (!awardResults || !awardResults.rounds) return {};
+
+      const labels = awardResults.rounds.map((_, index) => `Round ${index + 1}`);
+      const datasets = Object.keys(awardResults.rounds[0].votes || {}).map(nominee => {
+        return {
+          label: nominee,
+          data: awardResults.rounds.map(round => round.votes[nominee] || 0),
+          borderColor: this.getRandomColor(),
+          fill: false
+        };
+      });
+
+      return {
+        labels,
+        datasets
+      };
+    },
+    getRandomColor () {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
     }
   },
   async mounted () {
