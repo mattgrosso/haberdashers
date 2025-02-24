@@ -44,8 +44,7 @@ const routes = [
     path: "/results",
     component: Results, // Add the new Results route
     meta: {
-      requiresAuth: true,
-      requiresAdmin: true
+      requiresAuth: true
     }
   }
 ];

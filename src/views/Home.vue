@@ -2,21 +2,21 @@
   <div class="home">
     <div class="px-3">
       <h2 v-if="userName" class="text-center my-3">Welcome, {{ userName }}!</h2>
-      <p>Voting on the 2024 ballot is now closed.</p>
-      <p>The winners will be announced soon.</p>
+      <p>The results are in!</p>
+      <p>Thank you to all of our voters.</p>
     </div>
-    <!-- <Ballot /> -->
+    <Results />
   </div>
 </template>
 
 <script>
 import { auth } from "../assets/javascript/firebase.js";
-import Ballot from "../components/Ballot.vue";
+import Results from "./Results.vue";
 
 export default {
   name: "Home",
   components: {
-    Ballot,
+    Results,
   },
   computed: {
     userName () {

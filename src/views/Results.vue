@@ -37,16 +37,13 @@
         </div>
       </div>
       <div v-else-if="award[0] === 'The_Haberdasher_Legacy_Award'" class="card-body">
-        <ul class="list-group">
-          <li v-for="(movie, index) in legacyAwardArray" :key="index" class="list-group-item d-flex align-items-center">
-            <img :src="movie.poster" alt="Poster" class="movie-poster me-3"/>
-            <div>
-              <h5>{{ movie.nominee }}</h5>
-              <p class="m-0">Borda Score: {{ movie.votes.borda }}</p>
-              <p class="m-0">Ballots: {{ movie.votes.ballots }}</p>
+        <div class="row">
+          <div v-for="(movie, index) in filteredLegacyAwardArray" :key="index" class="col-12 col-sm-6 col-md-4 mb-4">
+            <div class="card h-100">
+              <img :src="movie.poster" alt="Poster" class="card-img-top"/>
             </div>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -71,7 +68,8 @@ export default {
     return {
       awards: {},
       winners: {},
-      legacyMovies: {} // Store movie details
+      legacyMovies: {},
+      voterCount: 0
     };
   },
   computed: {
@@ -97,6 +95,14 @@ export default {
         }
         return b.votes.borda - a.votes.borda;
       });
+    },
+    filteredLegacyAwardArray () {
+      const firstLoser = this.legacyAwardArray.find((movie) => {
+        return movie.votes.ballots < this.voterCount * 0.25;
+      })
+      const firstLoserIndex = this.legacyAwardArray.indexOf(firstLoser);
+
+      return this.legacyAwardArray.slice(0, firstLoserIndex);
     },
     chartOptions() {
       return {
@@ -186,6 +192,34 @@ export default {
         }
       } catch (error) {
         console.error("Error fetching results:", error);
+      }
+    },
+    async fetchVoterCount () {
+      try {
+        const usersRef = ref(db, "users");
+        const snapshot = await get(usersRef);
+        const users = snapshot.val();
+
+        let voterCount = 0;
+
+        // Count voters
+        for (const user of Object.values(users)) {
+          if (!user.ballot) continue;
+          let hasRanked = false;
+          for (const category of Object.keys(user.ballot)) {
+            if (user.ballot[category].ranked && user.ballot[category].ranked.length > 0) {
+              hasRanked = true;
+              break;
+            }
+          }
+          if (hasRanked) {
+            voterCount++;
+          }
+        }
+
+        this.voterCount = voterCount;
+      } catch (error) {
+        console.error("Error fetching voter count:", error);
       }
     },
     replaceUnderscoresWithPeriods (string) {
@@ -290,6 +324,7 @@ export default {
   },
   async mounted () {
     await this.fetchResults();
+    await this.fetchVoterCount();
   }
 };
 </script>
@@ -353,8 +388,8 @@ export default {
   }
 
   .movie-poster {
-    width: 50px;
-    height: 75px;
+    width: 100%;
+    height: 300px;
     object-fit: cover;
   }
 }

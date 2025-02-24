@@ -40,7 +40,7 @@ export default {
       winners: {},
       awards: {},
       showWinners: false,
-      voterCount: 0 // Add voterCount to data
+      voterCount: 0
     };
   },
   computed: {
@@ -76,7 +76,7 @@ export default {
 
         const results = {};
         const categories = new Set();
-        let voterCount = 0; // Initialize voterCount
+        let voterCount = 0;
 
         // Collect all categories and count voters
         for (const user of Object.values(users)) {
@@ -221,7 +221,7 @@ export default {
         this.awards = awardsSnap.val();
 
         this.winners = results;
-        this.voterCount = voterCount; // Update voterCount
+        this.voterCount = voterCount;
         this.showWinners = true;
       } catch (error) {
         console.error("Error evaluating ballots:", error);
@@ -250,7 +250,7 @@ export default {
           }
         }
 
-        this.voterCount = voterCount; // Update voterCount
+        this.voterCount = voterCount;
       } catch (error) {
         console.error("Error fetching voter count:", error);
       }
