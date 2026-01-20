@@ -34,11 +34,31 @@
               </div>
               <div v-if="year.isOpen">
                 <ol class="list-group list-group-numbered my-2">
-                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(nominee, index) in year.nominees" :key="index">
-                    {{nominee.name}}
-                    <button class="btn btn-link btn-sm text-danger" @click="removeNominee(award, year.year, nominee.name)">
-                      <i class="bi bi-trash"></i>
-                    </button>
+                  <li class="list-group-item d-flex justify-content-between align-items-center" v-for="(nominee, index) in year.nominees" :key="index" :class="{'flash-green': nominee.isNew}">
+                    <span v-if="!nominee.isEditing">{{nominee.name}}</span>
+                    <input
+                      v-else
+                      v-model="nominee.editName"
+                      type="text"
+                      class="form-control form-control-sm"
+                      @keyup.enter="saveNomineeEdit(award, year.year, nominee)"
+                      @keyup.esc="cancelNomineeEdit(nominee)"
+                      :ref="`edit-${award.key}-${year.year}-${index}`"
+                    >
+                    <div>
+                      <button v-if="!nominee.isEditing" class="btn btn-link btn-sm text-primary" @click="startEditNominee(award, year, nominee, index)">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button v-if="nominee.isEditing" class="btn btn-link btn-sm text-success" @click="saveNomineeEdit(award, year.year, nominee)">
+                        <i class="bi bi-check-lg"></i>
+                      </button>
+                      <button v-if="nominee.isEditing" class="btn btn-link btn-sm text-secondary" @click="cancelNomineeEdit(nominee)">
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                      <button v-if="!nominee.isEditing" class="btn btn-link btn-sm text-danger" @click="removeNominee(award, year.year, nominee.name)">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
                   </li>
                 </ol>
                 <div class="d-flex justify-content-end mt-2 my-4">
@@ -121,6 +141,7 @@ export default {
       isEditing: false,
       editingAwardKey: null,
       scrollPosition: 0,
+      previousNominees: {}, // Track nominees from previous fetch to detect new additions
     };
   },
   methods: {
@@ -176,13 +197,45 @@ export default {
           key,
           ...awardsData[key],
           showYearInput: false,
-          years: awardsData[key].years ? Object.keys(awardsData[key].years).map((year) => ({
-            year,
-            nominees: awardsData[key].years[year].nominees ? Object.values(awardsData[key].years[year].nominees) : [],
-            showNomineeInput: false,
-            newNominee: "", // Add local state for new nominee input
-            isOpen: parseInt(year) === parseInt(previousYear) && parseInt(currentMonth) < 4
-          })) : []
+          years: awardsData[key].years ? Object.keys(awardsData[key].years).map((year) => {
+            // Build unique key for this award/year combination
+            const trackingKey = `${key}_${year}`;
+            const currentNominees = awardsData[key].years[year].nominees
+              ? Object.values(awardsData[key].years[year].nominees)
+              : [];
+
+            // Get previous nominee names for this award/year
+            const previousNomineeNames = this.previousNominees[trackingKey] || [];
+
+            // Map nominees and check if they're new
+            const nominees = currentNominees.map(n => {
+              const isNew = !previousNomineeNames.includes(n.name);
+              return {
+                ...n,
+                isNew: isNew
+              };
+            });
+
+            // Update previousNominees for next comparison
+            this.previousNominees[trackingKey] = currentNominees.map(n => n.name);
+
+            // Clear isNew flag after animation duration
+            nominees.forEach(nominee => {
+              if (nominee.isNew) {
+                setTimeout(() => {
+                  nominee.isNew = false;
+                }, 1000);
+              }
+            });
+
+            return {
+              year,
+              nominees: nominees,
+              showNomineeInput: false,
+              newNominee: "", // Add local state for new nominee input
+              isOpen: parseInt(year) === parseInt(previousYear) && parseInt(currentMonth) < 4
+            };
+          }) : []
         })).sort((a, b) => a.rank - b.rank) : [];
       });
     },
@@ -210,26 +263,158 @@ export default {
         });
       }
     },
+    encodeFirebaseKey(str) {
+      // Encode special characters that Firebase doesn't allow in keys
+      return str
+        .replace(/\./g, '%2E')
+        .replace(/\$/g, '%24')
+        .replace(/#/g, '%23')
+        .replace(/\[/g, '%5B')
+        .replace(/\]/g, '%5D')
+        .replace(/\//g, '%2F');
+    },
+    decodeFirebaseKey(str) {
+      // Decode the encoded characters
+      return str
+        .replace(/%2E/g, '.')
+        .replace(/%24/g, '$')
+        .replace(/%23/g, '#')
+        .replace(/%5B/g, '[')
+        .replace(/%5D/g, ']')
+        .replace(/%2F/g, '/');
+    },
     async addNomineeTo (award, year) {
       const nominee = year.newNominee;
       if (nominee) {
-        const awardRef = ref(db, `awards/${award.key}/years/${year.year}/nominees/${nominee}`);
+        const encodedNominee = this.encodeFirebaseKey(nominee);
+        const awardRef = ref(db, `awards/${award.key}/years/${year.year}/nominees/${encodedNominee}`);
         await set(awardRef, {
           name: nominee
         });
         year.newNominee = ""; // Clear the local state for new nominee input
         year.showNomineeInput = false; // Hide the input field
-        this.fetchAwards();
+        // The isNew flag will be set automatically by fetchAwards() when it detects the new nominee
       }
     },
     async removeNominee (award, year, nominee) {
       try {
-        const nomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${nominee}`);
+        const encodedNominee = this.encodeFirebaseKey(nominee);
+        const nomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${encodedNominee}`);
         await remove(nomineeRef);
         this.fetchAwards();
       } catch (error) {
         console.error("Error removing nominee:", error);
       }
+    },
+    startEditNominee (award, year, nominee, index) {
+      // Set all other nominees to not editing
+      year.nominees.forEach(n => {
+        n.isEditing = false;
+      });
+      // Start editing this nominee
+      nominee.isEditing = true;
+      nominee.editName = nominee.name;
+      // Focus the input field
+      this.$nextTick(() => {
+        const inputRef = this.$refs[`edit-${award.key}-${year.year}-${index}`];
+        if (inputRef && inputRef[0]) {
+          inputRef[0].focus();
+          inputRef[0].select();
+        }
+      });
+    },
+    async saveNomineeEdit (award, year, nominee) {
+      if (!nominee.editName || nominee.editName.trim() === '') {
+        alert('Nominee name cannot be empty');
+        return;
+      }
+
+      const oldName = nominee.name;
+      const newName = nominee.editName.trim();
+
+      if (oldName === newName) {
+        nominee.isEditing = false;
+        return;
+      }
+
+      try {
+        // Encode names for Firebase keys
+        const encodedOldName = this.encodeFirebaseKey(oldName);
+        const encodedNewName = this.encodeFirebaseKey(newName);
+
+        // Check if new name already exists
+        const newNomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${encodedNewName}`);
+        const newNomineeSnap = await get(newNomineeRef);
+
+        if (newNomineeSnap.exists()) {
+          alert('A nominee with this name already exists');
+          return;
+        }
+
+        // Remove old nominee
+        const oldNomineeRef = ref(db, `awards/${award.key}/years/${year}/nominees/${encodedOldName}`);
+        await remove(oldNomineeRef);
+
+        // Add new nominee
+        await set(newNomineeRef, { name: newName });
+
+        // Update ballots - check both old and new ballot structures
+        const usersRef = ref(db, 'users');
+        const usersSnap = await get(usersRef);
+        const users = usersSnap.val();
+
+        if (users) {
+          const updates = {};
+          for (const [userKey, userData] of Object.entries(users)) {
+            // Check new ballot structure
+            if (userData.ballots && userData.ballots[year]) {
+              const ballot = userData.ballots[year][award.key];
+              if (ballot?.ranked) {
+                const rankedIndex = ballot.ranked.indexOf(oldName);
+                if (rankedIndex !== -1) {
+                  updates[`users/${userKey}/ballots/${year}/${award.key}/ranked/${rankedIndex}`] = newName;
+                }
+              }
+              if (ballot?.unseen) {
+                const unseenIndex = ballot.unseen.indexOf(oldName);
+                if (unseenIndex !== -1) {
+                  updates[`users/${userKey}/ballots/${year}/${award.key}/unseen/${unseenIndex}`] = newName;
+                }
+              }
+            }
+            // Check old ballot structure for backward compatibility
+            if (userData.ballot) {
+              const ballot = userData.ballot[award.key];
+              if (ballot?.ranked) {
+                const rankedIndex = ballot.ranked.indexOf(oldName);
+                if (rankedIndex !== -1) {
+                  updates[`users/${userKey}/ballot/${award.key}/ranked/${rankedIndex}`] = newName;
+                }
+              }
+              if (ballot?.unseen) {
+                const unseenIndex = ballot.unseen.indexOf(oldName);
+                if (unseenIndex !== -1) {
+                  updates[`users/${userKey}/ballot/${award.key}/unseen/${unseenIndex}`] = newName;
+                }
+              }
+            }
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await update(ref(db), updates);
+          }
+        }
+
+        nominee.isEditing = false;
+        this.fetchAwards();
+      } catch (error) {
+        console.error("Error editing nominee:", error);
+        alert('Error updating nominee. Please try again.');
+      }
+    },
+    cancelNomineeEdit (nominee) {
+      nominee.isEditing = false;
+      nominee.editName = nominee.name;
     },
     editCategory (award) {
       this.newAwardName = award.name;
@@ -310,6 +495,22 @@ export default {
     &:hover {
       background-color: darken($warning, 10%);
       border-color: darken($warning, 10%);
+    }
+  }
+
+  .flash-green {
+    animation: flashGreen 1s ease-in-out;
+  }
+
+  @keyframes flashGreen {
+    0% {
+      background-color: transparent;
+    }
+    50% {
+      background-color: #d4edda;
+    }
+    100% {
+      background-color: transparent;
     }
   }
 }

@@ -5,9 +5,17 @@
         <h2 class="card-title text-center">Ballot Management</h2>
       </div>
       <div class="card-body d-flex justify-content-around flex-wrap">
+        <div class="year-selector mb-4 col-12">
+          <label for="management-year-select" class="form-label">Select Year to Evaluate:</label>
+          <select id="management-year-select" v-model="selectedYear" @change="fetchVoterCount" class="form-select">
+            <option v-for="year in availableYears" :key="year" :value="year">
+              {{ year }}
+            </option>
+          </select>
+        </div>
         <button class="btn btn-primary mb-3 col-12" @click="sendEmailToUsers">Send Email to Users</button>
         <div class="d-flex align-items-center mb-3 col-12">
-          <button class="btn btn-secondary me-2 col-12" @click="evaluateBallots">Evaluate {{ voterCount }} Ballots</button>
+          <button class="btn btn-secondary me-2 col-12" @click="evaluateBallots" :disabled="!selectedYear">Evaluate {{ voterCount }} Ballots for {{ selectedYear }}</button>
         </div>
         <div v-if="showWinners">
           <h3 class="mt-4">Winners</h3>
@@ -40,12 +48,16 @@ export default {
       winners: {},
       awards: {},
       showWinners: false,
-      voterCount: 0
+      voterCount: 0,
+      selectedYear: null
     };
   },
   computed: {
     sortedAwards () {
       return Object.entries(this.awards).sort((a, b) => a[1].rank - b[1].rank);
+    },
+    availableYears () {
+      return this.$store.getters.availableYears;
     }
   },
   methods: {
@@ -69,6 +81,11 @@ export default {
       }
     },
     async evaluateBallots () {
+      if (!this.selectedYear) {
+        alert('Please select a year to evaluate');
+        return;
+      }
+
       try {
         const usersRef = ref(db, "users");
         const snapshot = await get(usersRef);
@@ -78,13 +95,27 @@ export default {
         const categories = new Set();
         let voterCount = 0;
 
+        // Helper function to get ballot for selected year (with fallback to old structure)
+        const getUserBallot = (user) => {
+          // Try new year-aware structure first
+          if (user.ballots && user.ballots[this.selectedYear]) {
+            return user.ballots[this.selectedYear];
+          }
+          // Fallback to old structure
+          if (user.ballot) {
+            return user.ballot;
+          }
+          return null;
+        };
+
         // Collect all categories and count voters
         for (const user of Object.values(users)) {
-          if (!user.ballot) continue;
+          const ballot = getUserBallot(user);
+          if (!ballot) continue;
           let hasRanked = false;
-          for (const category of Object.keys(user.ballot)) {
+          for (const category of Object.keys(ballot)) {
             categories.add(category);
-            if (user.ballot[category].ranked && user.ballot[category].ranked.length > 0) {
+            if (ballot[category].ranked && ballot[category].ranked.length > 0) {
               hasRanked = true;
             }
           }
@@ -100,7 +131,8 @@ export default {
 
           // Gather ranked ballots and all unique nominees
           for (const user of Object.values(users)) {
-            const catInfo = user.ballot?.[category];
+            const ballot = getUserBallot(user);
+            const catInfo = ballot?.[category];
             if (catInfo?.ranked) {
               rankedBallots.push(catInfo.ranked);
               catInfo.ranked.forEach(n => nomineeSet.add(n));
@@ -197,8 +229,9 @@ export default {
 
         const legacy = {};
         for (const user of Object.values(users)) {
-          if (user.ballot && user.ballot.The_Haberdasher_Legacy_Award && user.ballot.The_Haberdasher_Legacy_Award.ranked) {
-            user.ballot.The_Haberdasher_Legacy_Award.ranked.forEach((m, index) => {
+          const ballot = getUserBallot(user);
+          if (ballot && ballot.The_Haberdasher_Legacy_Award && ballot.The_Haberdasher_Legacy_Award.ranked) {
+            ballot.The_Haberdasher_Legacy_Award.ranked.forEach((m, index) => {
               if (legacy[m]) {
                 legacy[m].ballots++;
                 legacy[m].borda += Math.max(0, 10 - index);
@@ -213,7 +246,10 @@ export default {
         }
         results.The_Haberdasher_Legacy_Award = {
           nominees: legacy,
-          ballots: Object.values(users).filter(user => user.ballot && user.ballot.The_Haberdasher_Legacy_Award && user.ballot.The_Haberdasher_Legacy_Award.ranked).length // Add ballot count
+          ballots: Object.values(users).filter(user => {
+            const ballot = getUserBallot(user);
+            return ballot && ballot.The_Haberdasher_Legacy_Award && ballot.The_Haberdasher_Legacy_Award.ranked;
+          }).length // Add ballot count
         };
 
         const awardsRef = ref(db, "awards");
@@ -228,6 +264,8 @@ export default {
       }
     },
     async fetchVoterCount () {
+      if (!this.selectedYear) return;
+
       try {
         const usersRef = ref(db, "users");
         const snapshot = await get(usersRef);
@@ -235,12 +273,24 @@ export default {
 
         let voterCount = 0;
 
+        // Helper function to get ballot for selected year (with fallback to old structure)
+        const getUserBallot = (user) => {
+          if (user.ballots && user.ballots[this.selectedYear]) {
+            return user.ballots[this.selectedYear];
+          }
+          if (user.ballot) {
+            return user.ballot;
+          }
+          return null;
+        };
+
         // Count voters
         for (const user of Object.values(users)) {
-          if (!user.ballot) continue;
+          const ballot = getUserBallot(user);
+          if (!ballot) continue;
           let hasRanked = false;
-          for (const category of Object.keys(user.ballot)) {
-            if (user.ballot[category].ranked && user.ballot[category].ranked.length > 0) {
+          for (const category of Object.keys(ballot)) {
+            if (ballot[category].ranked && ballot[category].ranked.length > 0) {
               hasRanked = true;
               break;
             }
@@ -267,6 +317,11 @@ export default {
     }
   },
   async mounted () {
+    // Wait for store to initialize if needed
+    if (!this.$store.getters.selectedYear) {
+      await this.$store.dispatch('initializeYears');
+    }
+    this.selectedYear = this.$store.getters.selectedYear;
     await this.fetchVoterCount(); // Fetch voter count on mount
   }
 };

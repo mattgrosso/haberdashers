@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
 import AwardsConfig from "../views/AwardsConfig.vue";
 import BallotManagement from "../views/BallotManagement.vue";
+import AdminUtilities from "../views/AdminUtilities.vue";
 import Login from "../views/Login.vue";
 import Results from "../views/Results.vue"; // Import the new Results component
 import { auth } from "../assets/javascript/firebase";
@@ -35,6 +36,14 @@ const routes = [
   {
     path: "/ballot-management",
     component: BallotManagement,
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true
+    }
+  },
+  {
+    path: "/admin-utilities",
+    component: AdminUtilities,
     meta: {
       requiresAuth: true,
       requiresAdmin: true

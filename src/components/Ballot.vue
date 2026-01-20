@@ -139,6 +139,23 @@ export default {
     sortedAwards () {
       return [...this.awards].sort((a, b) => a.rank - b.rank);
     },
+    availableYears () {
+      return this.$store.getters.availableYears;
+    },
+    votingEnabledYears () {
+      // Filter years where voting is open
+      return this.availableYears.filter(year => {
+        const config = this.$store.state.yearConfigs[year];
+        return config?.votingOpen;
+      });
+    },
+    isVotingOpenForAnyYear () {
+      return this.votingEnabledYears.length > 0;
+    },
+    isVotingOpenForYear () {
+      const config = this.$store.state.yearConfigs[this.yearToUse];
+      return config?.votingOpen || false;
+    }
   },
   watch: {
     awards: {
@@ -148,12 +165,11 @@ export default {
   },
   methods: {
     async fetchAwards () {
+      if (!this.yearToUse) return;
+
       const awardsRef = ref(db, "awards");
       const snapshot = await get(awardsRef);
       const awardsData = snapshot.val();
-      const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth() + 1;
-      this.yearToUse = currentMonth < 4 ? currentYear - 1 : currentYear;
 
       const user = auth.currentUser;
       if (!user) {
@@ -162,7 +178,8 @@ export default {
       }
 
       const userKey = `${user.displayName.replace(/\s+/g, '_')}_${user.uid}`;
-      const userBallotRef = ref(db, `users/${userKey}/ballot`);
+      // Year-aware ballot structure - each year has its own ballot
+      const userBallotRef = ref(db, `users/${userKey}/ballots/${this.yearToUse}`);
       const userBallotSnapshot = await get(userBallotRef);
       const userBallotData = userBallotSnapshot.val() || {};
 
@@ -301,7 +318,8 @@ export default {
       }
 
       const userKey = `${user.displayName.replace(/\s+/g, '_')}_${user.uid}`;
-      const userBallotRef = ref(db, `users/${userKey}/ballot`);
+      // Save to year-aware ballot structure
+      const userBallotRef = ref(db, `users/${userKey}/ballots/${this.yearToUse}`);
       const ballotData = this.awards.reduce((acc, award) => {
         acc[award.key] = {
           ranked: award.seenMovies
@@ -339,11 +357,38 @@ export default {
       setTimeout(() => {
         this.showToast = false;
       }, 3000);
+    },
+    onYearChange () {
+      this.$store.dispatch('setSelectedYear', this.yearToUse);
+      // Reset state and reload awards for new year
+      this.awards = [];
+      this.legacyMovies = [];
+      this.selectedLegacyMovies = [];
+      this.currentPage = 1;
+      this.fetchAwards();
     }
   },
-  mounted () {
+  async mounted () {
     this.pageLoadedTime = new Date().getTime(); // Set the page loaded time
-    this.fetchAwards();
+
+    // Always initialize years to ensure store is populated
+    await this.$store.dispatch('initializeYears');
+
+    // Set initial year from store or use first voting-enabled year
+    const storeYear = this.$store.getters.selectedYear;
+    const votingYears = this.votingEnabledYears;
+
+    if (votingYears.includes(storeYear)) {
+      this.yearToUse = storeYear;
+    } else if (votingYears.length > 0) {
+      this.yearToUse = votingYears[0];
+      this.$store.dispatch('setSelectedYear', this.yearToUse);
+    } else {
+      // Fallback if no voting years are open
+      this.yearToUse = storeYear || new Date().getFullYear();
+    }
+
+    await this.fetchAwards();
   }
 };
 </script>

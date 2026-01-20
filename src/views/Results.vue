@@ -1,5 +1,13 @@
 <template>
   <div class="results p-3 mb-5">
+    <div class="year-selector mb-4">
+      <label for="year-select" class="form-label">Select Year:</label>
+      <select id="year-select" v-model="selectedYear" @change="onYearChange" class="form-select">
+        <option v-for="year in availableYears" :key="year" :value="year">
+          {{ year }} Results
+        </option>
+      </select>
+    </div>
     <div v-for="award in sortedAwards" :key="award[0]" class="mb-4 card">
       <div class="card-header bg-primary text-white">
         <h3>{{ award[1].name }}</h3>
@@ -69,18 +77,23 @@ export default {
       awards: {},
       winners: {},
       legacyMovies: {},
-      voterCount: 0
+      voterCount: 0,
+      selectedYear: null
     };
   },
   computed: {
     sortedAwards () {
       return Object.entries(this.awards || {}).sort((a, b) => a[1].rank - b[1].rank);
     },
-    lastYear () {
-      return new Date().getFullYear() - 1;
+    availableYears () {
+      // Only show years where results have been published
+      return this.$store.getters.availableYears.filter(year => {
+        const config = this.$store.state.yearConfigs[year];
+        return config?.resultsPublished;
+      });
     },
     legacyAwardArray () {
-      if (!this.winners.The_Haberdasher_Legacy_Award) return [];
+      if (!this.winners.The_Haberdasher_Legacy_Award?.nominees) return [];
       const nominees = Object.entries(this.winners.The_Haberdasher_Legacy_Award.nominees).map(([nominee, votes]) => {
         const posterPath = this.legacyMovies[this.replaceUnderscoresWithPeriods(nominee)]?.poster_path
         return {
@@ -168,6 +181,8 @@ export default {
   },
   methods: {
     async fetchResults () {
+      if (!this.selectedYear) return;
+
       try {
         const awardsRef = ref(db, "awards");
         const awardsSnap = await get(awardsRef);
@@ -175,7 +190,7 @@ export default {
 
         const results = {};
         for (const awardKey of Object.keys(this.awards)) {
-          const resultsRef = ref(db, `awards/${awardKey}/years/${this.lastYear}/results`);
+          const resultsRef = ref(db, `awards/${awardKey}/years/${this.selectedYear}/results`);
           const resultsSnap = await get(resultsRef);
           results[awardKey] = resultsSnap.val() || {};
         }
@@ -187,7 +202,7 @@ export default {
         });
 
         // Fetch movie details for legacy award nominees
-        if (this.winners.The_Haberdasher_Legacy_Award) {
+        if (this.winners.The_Haberdasher_Legacy_Award?.nominees) {
           await this.fetchLegacyMovies();
         }
       } catch (error) {
@@ -226,6 +241,7 @@ export default {
       return string.replace(/_/g, '.');
     },
     async fetchLegacyMovies () {
+      if (!this.winners.The_Haberdasher_Legacy_Award?.nominees) return;
       const nominees = Object.keys(this.winners.The_Haberdasher_Legacy_Award.nominees);
       const moviePromises = nominees.map(nominee => this.fetchMovieDetails(this.replaceUnderscoresWithPeriods(nominee)));
       const movies = await Promise.all(moviePromises);
@@ -320,11 +336,35 @@ export default {
         color += letters[Math.floor(Math.random() * 16)];
       }
       return color;
+    },
+    onYearChange () {
+      this.$store.dispatch('setSelectedYear', this.selectedYear);
+      this.fetchResults();
+      this.fetchVoterCount();
     }
   },
   async mounted () {
+    // Wait for store to initialize if needed
+    if (!this.$store.getters.selectedYear) {
+      await this.$store.dispatch('initializeYears');
+    }
+
+    // Default to most recent published year, not just any year
+    if (this.availableYears.length > 0) {
+      this.selectedYear = this.availableYears[0];
+    }
+
     await this.fetchResults();
     await this.fetchVoterCount();
+  },
+  watch: {
+    '$store.state.selectedYear' (newYear) {
+      if (newYear && newYear !== this.selectedYear) {
+        this.selectedYear = newYear;
+        this.fetchResults();
+        this.fetchVoterCount();
+      }
+    }
   }
 };
 </script>
@@ -335,6 +375,21 @@ export default {
 .results {
   max-width: 800px;
   margin: 0 auto;
+
+  .year-selector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .form-label {
+      margin-bottom: 0;
+      font-weight: bold;
+    }
+
+    .form-select {
+      max-width: 200px;
+    }
+  }
 
   .card-header {
     background-color: $primary;

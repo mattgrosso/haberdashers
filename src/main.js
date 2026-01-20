@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
+import store from "./store";
 import { auth } from "./assets/javascript/firebase";
 import "./assets/custom-bootstrap.scss"; // Import custom Bootstrap styles
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -11,6 +12,7 @@ let app;
 auth.onAuthStateChanged((user) => {
   if (!app) {
     app = createApp(App);
+    app.use(store);
     app.use(router);
     app.mount("#app");
   }

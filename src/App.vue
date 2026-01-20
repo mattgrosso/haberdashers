@@ -1,28 +1,34 @@
 <template>
   <div id="app">
-    <nav v-if="showNavbar" class="navbar navbar-expand-lg navbar-dark bg-dark p-0">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark p-0">
       <div class="container-fluid">
         <router-link class="navbar-brand" to="/">
           <img src="@/assets/images/icon.png" alt="Logo" class="navbar-icon" />
           The Haberdashers
         </router-link>
-        <button class="navbar-toggler" type="button" @click="toggleNavbar" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <button v-if="currentUser" class="navbar-toggler" type="button" @click="toggleNavbar" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
           <div :class="{'navbar-toggler-icon': true, 'open': !isNavbarCollapsed}">
             <span></span>
             <span></span>
             <span></span>
           </div>
         </button>
-        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <div v-if="currentUser" class="collapse navbar-collapse justify-content-end" id="navbarNav">
           <ul class="navbar-nav align-items-center">
-            <li v-if="userIsAdmin" class="nav-item text-center">
+            <li class="nav-item text-center">
               <router-link class="nav-link text-white" to="/" @click="handleNavClick">Ballot</router-link>
+            </li>
+            <li class="nav-item text-center">
+              <router-link class="nav-link text-white" to="/results" @click="handleNavClick">Past Results</router-link>
             </li>
             <li v-if="userIsAdmin" class="nav-item text-center">
               <router-link class="nav-link text-white" to="/admin" @click="handleNavClick">Awards Config</router-link>
             </li>
             <li v-if="userIsAdmin" class="nav-item text-center">
               <router-link class="nav-link text-white" to="/ballot-management" @click="handleNavClick">Ballot Management</router-link>
+            </li>
+            <li v-if="userIsAdmin" class="nav-item text-center">
+              <router-link class="nav-link text-white" to="/admin-utilities" @click="handleNavClick">Admin Utilities</router-link>
             </li>
             <li class="nav-item text-center">
               <a class="nav-link text-white" href="#" @click="logout">Logout</a>
@@ -39,8 +45,8 @@
 <script>
 import { Collapse } from "bootstrap";
 import { auth } from "./assets/javascript/firebase.js";
+import { onAuthStateChanged } from "firebase/auth";
 import { getDatabase, ref, get } from "firebase/database";
-import { useRoute } from "vue-router";
 
 const db = getDatabase();
 
@@ -49,18 +55,22 @@ export default {
   data () {
     return {
       isNavbarCollapsed: true,
-      showNavbar: true,
-      adminUsers: [] // Initialize adminUsers as an empty array
+      adminUsers: [],
+      currentUser: null // Track auth state reactively
     };
   },
   async mounted () {
-    const route = useRoute();
-    this.showNavbar = route.path !== "/login";
-    await this.fetchAdminUsers();
+    // Listen for auth state changes
+    onAuthStateChanged(auth, async (user) => {
+      this.currentUser = user;
+      if (user) {
+        await this.fetchAdminUsers();
+      }
+    });
   },
   computed: {
     userIsAdmin () {
-      return auth.currentUser ? this.adminUsers.includes(auth.currentUser.uid) : false;
+      return this.currentUser ? this.adminUsers.includes(this.currentUser.uid) : false;
     },
     version () {
       return process.env.VUE_APP_VERSION;
