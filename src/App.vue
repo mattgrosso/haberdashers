@@ -63,6 +63,8 @@ export default {
     // Listen for auth state changes
     onAuthStateChanged(auth, async (user) => {
       this.currentUser = user;
+      // Reset navbar state when auth changes to ensure icon matches collapsed state
+      this.isNavbarCollapsed = true;
       if (user) {
         await this.fetchAdminUsers();
       }

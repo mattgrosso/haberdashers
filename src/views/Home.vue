@@ -3,7 +3,7 @@
     <div class="px-3">
       <h2 v-if="userName" class="text-center my-3">Welcome, {{ userName }}!</h2>
       <p>Voting is open for {{ votingYear }}!</p>
-      <p>Rank your favorites below.</p>
+      <p>Rank your favorites below.<br/>(It's ok if you haven't seen them all. Just rank the ones you have seen and liked)</p>
     </div>
     <Ballot />
   </div>
