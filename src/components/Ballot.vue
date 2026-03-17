@@ -1,5 +1,9 @@
 <template>
   <div class="ballot p-3 mb-5">
+    <div v-if="!isVotingOpenForYear" class="alert alert-warning text-center">
+      Voting for {{ yearToUse }} is now closed. Thank you for participating!
+    </div>
+    <template v-else>
     <div v-for="award in sortedAwards" :key="award.key" class="card mb-3">
       <div class="card-header bg-primary text-white">
         <h3 class="card-title">{{ award.name }} of {{ yearToUse }}</h3>
@@ -92,6 +96,7 @@
     <div class="save-button d-flex justify-content-end">
       <button class="btn btn-primary" @click="saveBallot">Save Ballot</button>
     </div>
+    </template>
     <!-- Toast Notification -->
     <div v-if="showToast" class="toast align-items-center p-1" :class="{show: showToast}" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
@@ -314,6 +319,10 @@ export default {
       const user = auth.currentUser;
       if (!user) {
         console.error("User not authenticated");
+        return;
+      }
+      if (!this.isVotingOpenForYear) {
+        console.error("Voting is closed for this year");
         return;
       }
 

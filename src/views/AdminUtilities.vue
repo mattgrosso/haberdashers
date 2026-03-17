@@ -6,6 +6,25 @@
       </div>
       <div class="card-body">
         <div class="mb-4">
+          <h4>Voting Status</h4>
+          <p class="text-muted">Open or lock voting for each year</p>
+          <div v-for="year in availableYears" :key="year" class="d-flex align-items-center gap-3 mb-2">
+            <span class="fw-bold">{{ year }}:</span>
+            <span :class="yearConfigs[year]?.votingOpen ? 'text-success' : 'text-danger'">
+              {{ yearConfigs[year]?.votingOpen ? 'Open' : 'Locked' }}
+            </span>
+            <button v-if="yearConfigs[year]?.votingOpen" class="btn btn-sm btn-danger" @click="setVotingStatus(year, false)" :disabled="loading">
+              Lock Voting
+            </button>
+            <button v-else class="btn btn-sm btn-success" @click="setVotingStatus(year, true)" :disabled="loading">
+              Open Voting
+            </button>
+          </div>
+        </div>
+
+        <hr/>
+
+        <div class="mb-4">
           <h4>Year Configuration</h4>
           <p class="text-muted">Initialize or update year configuration in Firebase</p>
           <button class="btn btn-primary" @click="initializeYearConfig" :disabled="loading">
@@ -73,7 +92,7 @@
 </template>
 
 <script>
-import { initializeYearConfig } from '../utils/initializeYearConfig';
+import { initializeYearConfig, updateVotingStatus } from '../utils/initializeYearConfig';
 import { migrateBallots, verifyMigration } from '../utils/migrateBallots';
 import { getDatabase, ref, get, remove } from 'firebase/database';
 
@@ -81,6 +100,14 @@ const db = getDatabase();
 
 export default {
   name: 'AdminUtilities',
+  computed: {
+    availableYears () {
+      return this.$store.getters.availableYears;
+    },
+    yearConfigs () {
+      return this.$store.state.yearConfigs;
+    }
+  },
   data() {
     return {
       migrationYear: 2024,
@@ -90,6 +117,19 @@ export default {
     };
   },
   methods: {
+    async setVotingStatus(year, isOpen) {
+      this.loading = true;
+      this.output = '';
+      try {
+        await updateVotingStatus(year, isOpen);
+        await this.$store.dispatch('initializeYears');
+        this.output = `Voting for ${year} is now ${isOpen ? 'open' : 'locked'}.`;
+      } catch (error) {
+        this.output = `Error: ${error.message}`;
+      } finally {
+        this.loading = false;
+      }
+    },
     async initializeYearConfig() {
       this.loading = true;
       this.output = '';

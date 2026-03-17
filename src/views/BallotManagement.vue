@@ -17,7 +17,12 @@
         <div class="d-flex align-items-center mb-3 col-12">
           <button class="btn btn-secondary me-2 col-12" @click="evaluateBallots" :disabled="!selectedYear">Evaluate {{ voterCount }} Ballots for {{ selectedYear }}</button>
         </div>
-        <div v-if="showWinners">
+        <div v-if="showWinners" class="mb-3 col-12">
+          <button class="btn btn-success col-12 text-white" @click="publishResults" :disabled="publishing">
+            {{ publishing ? 'Publishing...' : `Publish Results for ${selectedYear}` }}
+          </button>
+        </div>
+        <div v-if="showWinners" class="col-12">
           <h3 class="mt-4">Winners</h3>
           <ul class="list-group">
             <li class="list-group-item" v-for="award in sortedAwards" :key="award[0]">
@@ -37,7 +42,8 @@
 </template>
 
 <script>
-import { getDatabase, ref, get } from "firebase/database";
+import { getDatabase, ref, get, set } from "firebase/database";
+import { publishResults as publishResultsFlag } from "../utils/initializeYearConfig";
 
 const db = getDatabase();
 
@@ -49,11 +55,13 @@ export default {
       awards: {},
       showWinners: false,
       voterCount: 0,
-      selectedYear: null
+      selectedYear: null,
+      publishing: false
     };
   },
   computed: {
     sortedAwards () {
+      if (!this.awards) return [];
       return Object.entries(this.awards).sort((a, b) => a[1].rank - b[1].rank);
     },
     availableYears () {
@@ -80,6 +88,98 @@ export default {
         console.error("Error sending email to users:", error);
       }
     },
+    sanitizeKey (key) {
+      return key.replace(/[.#$/[\]]/g, '_');
+    },
+    async runoffBallots (rankedBallots, nominees) {
+      let rounds = [];
+      let eliminated = new Set();
+      let eliminationOrder = [];
+
+      while (true) {
+        const remainingCandidates = nominees.filter(nom => !eliminated.has(nom));
+
+        let voteCounts = {};
+        remainingCandidates.forEach(nom => { voteCounts[nom] = 0; });
+        for (const ballot of rankedBallots) {
+          const choice = ballot.find(nom => !eliminated.has(nom));
+          if (choice) voteCounts[choice]++;
+        }
+
+        let bordaCounts = {};
+        remainingCandidates.forEach(nom => { bordaCounts[nom] = 0; });
+        for (const ballot of rankedBallots) {
+          for (const candidate of remainingCandidates) {
+            const idx = ballot.indexOf(candidate);
+            if (idx !== -1) {
+              bordaCounts[candidate] += (ballot.length - idx);
+            }
+          }
+        }
+
+        rounds.push({ votes: { ...voteCounts }, borda: { ...bordaCounts } });
+
+        const activeBallots = rankedBallots.filter(ballot =>
+          ballot.some(candidate => !eliminated.has(candidate))
+        );
+        const totalVotes = activeBallots.length;
+        const majority = totalVotes / 2;
+
+        for (const [candidate, count] of Object.entries(voteCounts)) {
+          if (count > majority) {
+            eliminationOrder.push(...remainingCandidates.filter(c => c !== candidate));
+            eliminationOrder.push(candidate);
+            return { winner: candidate, rounds, rankedNominees: eliminationOrder.reverse() };
+          }
+        }
+
+        if (remainingCandidates.length === 2) {
+          const [cand1, cand2] = remainingCandidates;
+          if (voteCounts[cand1] === voteCounts[cand2]) {
+            if (bordaCounts[cand1] > bordaCounts[cand2]) {
+              eliminationOrder.push(cand2, cand1);
+              return { winner: cand1, rounds, rankedNominees: eliminationOrder.reverse() };
+            } else if (bordaCounts[cand2] > bordaCounts[cand1]) {
+              eliminationOrder.push(cand1, cand2);
+              return { winner: cand2, rounds, rankedNominees: eliminationOrder.reverse() };
+            } else {
+              eliminationOrder.push(cand1, cand2);
+              return { winner: "tie", rounds, rankedNominees: eliminationOrder.reverse() };
+            }
+          }
+        }
+
+        const minVotes = Math.min(...Object.values(voteCounts));
+        let candidatesForElimination = Object.entries(voteCounts)
+          .filter(([_, count]) => count === minVotes)
+          .map(([nom]) => nom);
+
+        if (candidatesForElimination.length > 1) {
+          const bordaTie = {};
+          candidatesForElimination.forEach(candidate => {
+            bordaTie[candidate] = bordaCounts[candidate];
+          });
+          const minBorda = Math.min(...Object.values(bordaTie));
+          const tiedByBorda = candidatesForElimination.filter(candidate => bordaTie[candidate] === minBorda);
+          if (tiedByBorda.length === 1) {
+            eliminated.add(tiedByBorda[0]);
+            eliminationOrder.push(tiedByBorda[0]);
+          } else {
+            tiedByBorda.forEach(candidate => {
+              eliminated.add(candidate);
+              eliminationOrder.push(candidate);
+            });
+          }
+        } else {
+          eliminated.add(candidatesForElimination[0]);
+          eliminationOrder.push(candidatesForElimination[0]);
+        }
+
+        if (nominees.filter(nom => !eliminated.has(nom)).length === 0) {
+          return { winner: "tie", rounds, rankedNominees: eliminationOrder.reverse() };
+        }
+      }
+    },
     async evaluateBallots () {
       if (!this.selectedYear) {
         alert('Please select a year to evaluate');
@@ -91,24 +191,17 @@ export default {
         const snapshot = await get(usersRef);
         const users = snapshot.val();
 
+        if (!users) return;
+
         const results = {};
         const categories = new Set();
         let voterCount = 0;
 
-        // Helper function to get ballot for selected year (with fallback to old structure)
+        // Get ballot for the selected year only
         const getUserBallot = (user) => {
-          // Try new year-aware structure first
-          if (user.ballots && user.ballots[this.selectedYear]) {
-            return user.ballots[this.selectedYear];
-          }
-          // Fallback to old structure
-          if (user.ballot) {
-            return user.ballot;
-          }
-          return null;
+          return user.ballots?.[this.selectedYear] || null;
         };
 
-        // Collect all categories and count voters
         for (const user of Object.values(users)) {
           const ballot = getUserBallot(user);
           if (!ballot) continue;
@@ -119,17 +212,15 @@ export default {
               hasRanked = true;
             }
           }
-          if (hasRanked) {
-            voterCount++;
-          }
+          if (hasRanked) voterCount++;
         }
 
-        // Process each category
         for (const category of categories) {
+          if (category === 'The_Haberdasher_Legacy_Award') continue;
+
           const rankedBallots = [];
           const nomineeSet = new Set();
 
-          // Gather ranked ballots and all unique nominees
           for (const user of Object.values(users)) {
             const ballot = getUserBallot(user);
             const catInfo = ballot?.[category];
@@ -142,125 +233,90 @@ export default {
           const nominees = [...nomineeSet];
           if (nominees.length === 0) continue;
 
-          // Step A: pairwise preferences d(A,B)
-          const d = {};
-          nominees.forEach(a => {
-            d[a] = {};
-            nominees.forEach(b => {
-              if (a !== b) d[a][b] = 0;
-            });
-          });
+          const { winner, rounds, rankedNominees } = await this.runoffBallots(rankedBallots, nominees);
 
-          for (const ballot of rankedBallots) {
-            for (let i = 0; i < ballot.length; i++) {
-              for (let j = i + 1; j < ballot.length; j++) {
-                d[ballot[i]][ballot[j]] += 1;
-              }
-            }
-          }
-
-          // Step B: compute strongest paths D(A,B)
-          const D = {};
-          nominees.forEach(a => {
-            D[a] = {};
-            nominees.forEach(b => {
-              D[a][b] = 0;
-            });
-          });
-
-          // If d(A,B) > d(B,A), set D(A,B) = d(A,B)
-          nominees.forEach(a => {
-            nominees.forEach(b => {
-              if (a !== b && d[a][b] > d[b][a]) {
-                D[a][b] = d[a][b];
-              }
-            });
-          });
-
-          // Floyd–Warshall-like update
-          nominees.forEach(i => {
-            nominees.forEach(j => {
-              if (i === j) return;
-              nominees.forEach(k => {
-                if (i === k || j === k) return;
-                D[j][k] = Math.max(D[j][k], Math.min(D[j][i], D[i][k]));
-              });
-            });
-          });
-
-          // Step C: build a ranking rather than just picking winners
-          // 1. For each nominee, count how many others it "beats"
-          //    (i.e., D(a,b) > D(b,a)).
-          const beatsCount = {};
-          nominees.forEach(a => {
-            let count = 0;
-            for (const b of nominees) {
-              if (b !== a && D[a][b] > D[b][a]) count++;
-            }
-            beatsCount[a] = count;
-          });
-
-          // 2. Sort nominees by descending beatsCount
-          const sorted = [...nominees].sort((x, y) => beatsCount[y] - beatsCount[x]);
-
-          // 3. Assign ranks and scores: ties get the same rank, skip subsequent ranks
-          const categoryResult = {};
-          let currentRank = 1;
-          let numProcessed = 0;
-          let previousScore = null;
-
-          for (let i = 0; i < sorted.length; i++) {
-            const nominee = sorted[i];
-            const score = beatsCount[nominee];
-            if (previousScore !== null && score < previousScore) {
-              currentRank = numProcessed + 1;
-            }
-            categoryResult[nominee] = { rank: currentRank, score: score };
-            previousScore = score;
-            numProcessed++;
-          }
-
-          // Store final ranking and ballot count for this category
           results[category] = {
-            nominees: categoryResult,
-            ballots: rankedBallots.length // Add ballot count
+            winner,
+            rounds,
+            rankedNominees,
+            ballots: rankedBallots.length
           };
         }
 
         const legacy = {};
         for (const user of Object.values(users)) {
           const ballot = getUserBallot(user);
-          if (ballot && ballot.The_Haberdasher_Legacy_Award && ballot.The_Haberdasher_Legacy_Award.ranked) {
+          if (ballot?.The_Haberdasher_Legacy_Award?.ranked) {
             ballot.The_Haberdasher_Legacy_Award.ranked.forEach((m, index) => {
-              if (legacy[m]) {
-                legacy[m].ballots++;
-                legacy[m].borda += Math.max(0, 10 - index);
+              const sanitizedNominee = this.sanitizeKey(m);
+              if (legacy[sanitizedNominee]) {
+                legacy[sanitizedNominee].ballots++;
+                legacy[sanitizedNominee].borda += Math.max(0, 10 - index);
               } else {
-                legacy[m] = {
-                  ballots: 1,
-                  borda: Math.max(0, 10 - index)
-                }
+                legacy[sanitizedNominee] = { ballots: 1, borda: Math.max(0, 10 - index) };
               }
-            })
+            });
           }
         }
         results.The_Haberdasher_Legacy_Award = {
           nominees: legacy,
           ballots: Object.values(users).filter(user => {
             const ballot = getUserBallot(user);
-            return ballot && ballot.The_Haberdasher_Legacy_Award && ballot.The_Haberdasher_Legacy_Award.ranked;
-          }).length // Add ballot count
+            return ballot?.The_Haberdasher_Legacy_Award?.ranked;
+          }).length
         };
 
         const awardsRef = ref(db, "awards");
         const awardsSnap = await get(awardsRef);
-        this.awards = awardsSnap.val();
+        this.awards = awardsSnap.val() || {};
 
         this.winners = results;
         this.voterCount = voterCount;
         this.showWinners = true;
       } catch (error) {
         console.error("Error evaluating ballots:", error);
+      }
+    },
+    sanitizeResult (result) {
+      if (!result || !result.rounds) return result;
+      const sanitizedRounds = result.rounds.map(round => {
+        const votes = {};
+        const borda = {};
+        for (const [k, v] of Object.entries(round.votes || {})) {
+          votes[this.sanitizeKey(k)] = v;
+        }
+        for (const [k, v] of Object.entries(round.borda || {})) {
+          borda[this.sanitizeKey(k)] = v;
+        }
+        return { votes, borda };
+      });
+      return {
+        ...result,
+        winner: result.winner ? this.sanitizeKey(result.winner) : result.winner,
+        rankedNominees: (result.rankedNominees || []).map(n => this.sanitizeKey(n)),
+        rounds: sanitizedRounds
+      };
+    },
+    async publishResults () {
+      if (!confirm(`Publish results for ${this.selectedYear}? This will make them visible on the Past Results page.`)) return;
+
+      this.publishing = true;
+      try {
+        for (const [awardKey, result] of Object.entries(this.winners)) {
+          const resultsRef = ref(db, `awards/${awardKey}/years/${this.selectedYear}/results`);
+          const sanitized = awardKey === 'The_Haberdasher_Legacy_Award' ? result : this.sanitizeResult(result);
+          await set(resultsRef, sanitized);
+        }
+
+        await publishResultsFlag(this.selectedYear);
+        await this.$store.dispatch('initializeYears');
+
+        alert(`Results for ${this.selectedYear} have been published!`);
+      } catch (error) {
+        console.error("Error publishing results:", error);
+        alert("Error publishing results. Check the console for details.");
+      } finally {
+        this.publishing = false;
       }
     },
     async fetchVoterCount () {
@@ -271,32 +327,17 @@ export default {
         const snapshot = await get(usersRef);
         const users = snapshot.val();
 
+        if (!users) return;
+
         let voterCount = 0;
-
-        // Helper function to get ballot for selected year (with fallback to old structure)
-        const getUserBallot = (user) => {
-          if (user.ballots && user.ballots[this.selectedYear]) {
-            return user.ballots[this.selectedYear];
-          }
-          if (user.ballot) {
-            return user.ballot;
-          }
-          return null;
-        };
-
-        // Count voters
         for (const user of Object.values(users)) {
-          const ballot = getUserBallot(user);
+          const ballot = user.ballots?.[this.selectedYear];
           if (!ballot) continue;
-          let hasRanked = false;
           for (const category of Object.keys(ballot)) {
             if (ballot[category].ranked && ballot[category].ranked.length > 0) {
-              hasRanked = true;
+              voterCount++;
               break;
             }
-          }
-          if (hasRanked) {
-            voterCount++;
           }
         }
 
@@ -306,7 +347,9 @@ export default {
       }
     },
     sortedNominees (award) {
-      return Object.entries(this.winners[award[0]].nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
+      const nominees = this.winners[award[0]]?.nominees;
+      if (!nominees) return [];
+      return Object.entries(nominees).sort((a, b) => award[0] === 'The_Haberdasher_Legacy_Award' ? b[1].borda - a[1].borda : a[1].rank - b[1].rank);
     },
     toTitleCase (str) {
       return str
@@ -317,12 +360,11 @@ export default {
     }
   },
   async mounted () {
-    // Wait for store to initialize if needed
     if (!this.$store.getters.selectedYear) {
       await this.$store.dispatch('initializeYears');
     }
     this.selectedYear = this.$store.getters.selectedYear;
-    await this.fetchVoterCount(); // Fetch voter count on mount
+    await this.fetchVoterCount();
   }
 };
 </script>
