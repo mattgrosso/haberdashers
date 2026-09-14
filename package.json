@@ -7,7 +7,7 @@
     "serve": "nodemon --watch .env --exec \"vue-cli-service serve\"",
     "build": "yarn update-version && vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "deploy": "yarn build && aws s3 sync dist/ s3://haberdashers --profile home && aws cloudfront create-invalidation --distribution-id E10LZ1505D1O9G --paths '/*' --profile home > invalidation_output.txt"
+    "deploy": "yarn build && aws s3 sync dist/ s3://haberdashers --profile personal-deploy && aws cloudfront create-invalidation --distribution-id E10LZ1505D1O9G --paths '/*' --profile personal-deploy > invalidation_output.txt"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
