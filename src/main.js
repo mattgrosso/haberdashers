@@ -6,6 +6,10 @@ import { auth } from "./assets/javascript/firebase";
 import "./assets/custom-bootstrap.scss"; // Import custom Bootstrap styles
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "@popperjs/core";
+import { trackUsage } from './utils/usage.js';
+
+// One anonymous ping per open → Bug Desk's Visitors tab (house module).
+trackUsage('haberdashers');
 
 let app;
 
